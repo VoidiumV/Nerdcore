@@ -248,8 +248,20 @@
   .release-links a{ font-size:12px; text-decoration:none; color:var(--muted-dim); border-bottom:1px dotted var(--muted-dim); }
   .release-links a:hover{ color:var(--green); border-color:var(--green); }
 
-  /* ---------- top 5 ---------- */
-  .week-block{ margin-bottom:34px; }
+  /* ---------- top 5 / top 10 / playlists / artist stats ---------- */
+  .subtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:24px; }
+  .subtab{
+    font-family:'Press Start 2P', monospace; font-size:9px;
+    background:var(--panel); color:var(--muted-dim);
+    border:2px solid var(--border); padding:9px 12px;
+    cursor:pointer; letter-spacing:0.5px; user-select:none;
+  }
+  .subtab:hover{ color:var(--muted); }
+  .subtab.active{ color:var(--amber); border-color:var(--amber); box-shadow:0 0 8px rgba(255,182,39,0.3); }
+  .subpane{ display:none; }
+  .subpane.active{ display:block; }
+
+  .week-block{ margin-bottom:24px; }
   .week-head{
     display:flex; align-items:center; gap:10px; cursor:pointer;
     background:var(--panel-2); border:2px solid var(--border);
@@ -267,14 +279,36 @@
     padding:12px 16px; box-shadow:3px 3px 0 rgba(0,0,0,0.3);
   }
   .rank-num{
-    font-family:'Press Start 2P', monospace; font-size:20px; color:var(--magenta);
-    width:34px; text-align:center; flex-shrink:0;
+    font-family:'Press Start 2P', monospace; font-size:16px; color:var(--magenta);
+    width:38px; text-align:center; flex-shrink:0;
   }
-  .rank-cover{ width:64px; height:64px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; background:#0a0d1c; }
   .rank-info{ min-width:0; flex:1; }
   .rank-song{ font-family:'VT323', monospace; font-size:19px; color:var(--green); }
   .rank-artist{ font-family:'VT323', monospace; font-size:15px; color:var(--muted); }
-  .rank-blurb{ font-family:'Space Mono', monospace; font-size:12.5px; color:var(--ink); margin-top:5px; line-height:1.5; }
+
+  .playlist-card{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    background:var(--panel); border:2px solid var(--border);
+    padding:16px 20px; margin-bottom:12px; box-shadow:3px 3px 0 rgba(0,0,0,0.3);
+  }
+  .playlist-year{ font-family:'Press Start 2P', monospace; font-size:14px; color:var(--ink); }
+  .playlist-link{
+    font-family:'VT323', monospace; font-size:16px; color:#1DB954;
+    border:2px solid #1DB954; padding:6px 14px; text-decoration:none;
+  }
+  .playlist-link:hover{ background:#1DB954; color:#0b0e1a; }
+
+  .stats-table{ width:100%; border-collapse:collapse; }
+  .stats-table th{
+    font-family:'Press Start 2P', monospace; font-size:9px; color:var(--amber);
+    text-align:left; padding:10px 12px; border-bottom:2px solid var(--border);
+  }
+  .stats-table td{
+    font-family:'VT323', monospace; font-size:16px; color:var(--ink);
+    padding:9px 12px; border-bottom:1px solid var(--border);
+  }
+  .stats-table td.num{ color:var(--green); text-align:center; }
+  .stats-table tr:hover td{ background:var(--panel-2); }
 
   /* ---------- encyclopedia flipbook ---------- */
   .flip-wrap{
@@ -397,18 +431,29 @@
 <div class="page" id="view-top5" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
-    <div class="eyebrow">WEEKLY</div>
+    <div class="eyebrow">RANKINGS</div>
     <h1>TOP 5 NERDCORE SONGS</h1>
-    <p>Ranked picks, one week at a time.</p>
+    <p>Weekly picks, the year's best, playlists, and who shows up the most.</p>
   </div>
-  <div id="top5-content"><div class="loading">Loading rankings&hellip;</div></div>
+
+  <div class="subtabs">
+    <div class="subtab active" data-pane="weekly">WEEKLY TOP 5</div>
+    <div class="subtab" data-pane="yearly">TOP 10 OF THE YEAR</div>
+    <div class="subtab" data-pane="playlists">PLAYLISTS</div>
+    <div class="subtab" data-pane="stats">MOST FEATURED</div>
+  </div>
+
+  <div class="subpane active" id="pane-weekly"><div class="loading">Loading weekly rankings&hellip;</div></div>
+  <div class="subpane" id="pane-yearly"><div class="loading">Loading yearly rankings&hellip;</div></div>
+  <div class="subpane" id="pane-playlists"><div class="loading">Loading playlists&hellip;</div></div>
+  <div class="subpane" id="pane-stats"><div class="loading">Loading artist stats&hellip;</div></div>
 </div>
 
 <script>
   // ================================================================
   // CONFIG — swap this for your deployed Apps Script web app URL
   // ================================================================
-  var API_BASE_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzO1fPV1eq1EEthmZu2ojvl1xSrVHaYDCrEWHxp4-LWmFjQfIioiSO7tDKtGB781Cnc/exec';
 
   // ================================================================
   // JSONP API CLIENT (same pattern as Indie Monday — avoids CORS
@@ -557,6 +602,16 @@
   }
   window.addEventListener('popstate', routeFromHash);
   window.addEventListener('hashchange', routeFromHash);
+
+  document.querySelectorAll('.subtab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var pane = tab.getAttribute('data-pane');
+      document.querySelectorAll('.subtab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.subpane').forEach(function (p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('pane-' + pane).classList.add('active');
+    });
+  });
 
   document.querySelectorAll('[data-route]').forEach(function (el) {
     el.addEventListener('click', function () {
@@ -738,55 +793,131 @@
     }).join('');
   }
 
-  // ---------------- TOP 5 ----------------
+  // ---------------- TOP 5 (weekly / yearly / playlists / stats) ----------------
   function loadTop5() {
-    api('top5').then(function (weeks) {
-      top5Loaded = true;
-      renderTop5(weeks || []);
-    }).catch(function (err) {
-      renderErrorWithRetry(document.getElementById('top5-content'),
-        "Couldn't load rankings: " + escapeHtml(err.message || err), loadTop5);
-    });
+    top5Loaded = true;
+    loadTop5Weekly();
+    loadTop10Yearly();
+    loadPlaylists();
+    loadArtistStats();
   }
 
-  function renderTop5(weeks) {
-    var container = document.getElementById('top5-content');
-    if (!weeks.length) { container.innerHTML = '<div class="empty">No Top 5 lists posted yet.</div>'; return; }
-    var fallback = getFallbackImage();
+  function rankedListHtml(entries) {
+    return (entries || []).map(function (e) {
+      return (
+        '<div class="rank-card">' +
+          '<div class="rank-num">' + escapeHtml(e.rank) + '</div>' +
+          '<div class="rank-info">' +
+            '<div class="rank-song">' + escapeHtml(e.title || '(untitled)') + '</div>' +
+            (e.artist ? '<div class="rank-artist">by ' + escapeHtml(e.artist) + '</div>' : '') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
 
-    container.innerHTML = weeks.map(function (week, wIdx) {
-      var collapsed = wIdx > 0; // most recent week open by default
-      var rows = (week.entries || []).map(function (e) {
-        var img = e.cover ? escapeHtml(e.cover) : fallback;
+  function loadTop5Weekly() {
+    var container = document.getElementById('pane-weekly');
+    api('top5').then(function (weeks) {
+      weeks = weeks || [];
+      if (!weeks.length) { container.innerHTML = '<div class="empty">No weekly Top 5 lists posted yet.</div>'; return; }
+
+      container.innerHTML = weeks.map(function (week, wIdx) {
+        var collapsed = wIdx > 0; // most recent week open by default
         return (
-          '<div class="rank-card">' +
-            '<div class="rank-num">' + escapeHtml(e.rank) + '</div>' +
-            '<img class="rank-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
-            '<div class="rank-info">' +
-              '<div class="rank-song">' + escapeHtml(e.title) + '</div>' +
-              '<div class="rank-artist">by ' + escapeHtml(e.artist) + '</div>' +
-              (e.blurb ? '<div class="rank-blurb">' + escapeHtml(e.blurb) + '</div>' : '') +
+          '<div class="week-block">' +
+            '<div class="week-head' + (collapsed ? ' collapsed' : '') + '" data-week="' + wIdx + '">' +
+              '<span class="arrow">&#9660;</span><h3>WEEK OF ' + escapeHtml(week.weekOf) + '</h3>' +
+            '</div>' +
+            '<div class="week-entries' + (collapsed ? ' collapsed' : '') + '" id="week-entries-' + wIdx + '">' +
+              rankedListHtml(week.entries) +
             '</div>' +
           '</div>'
         );
       }).join('');
 
-      return (
-        '<div class="week-block">' +
-          '<div class="week-head' + (collapsed ? ' collapsed' : '') + '" data-week="' + wIdx + '">' +
-            '<span class="arrow">&#9660;</span><h3>WEEK OF ' + escapeHtml(week.weekOf) + '</h3>' +
-          '</div>' +
-          '<div class="week-entries' + (collapsed ? ' collapsed' : '') + '" id="week-entries-' + wIdx + '">' + rows + '</div>' +
-        '</div>'
-      );
-    }).join('');
-
-    container.querySelectorAll('.week-head').forEach(function (head) {
-      head.addEventListener('click', function () {
-        head.classList.toggle('collapsed');
-        var idx = head.getAttribute('data-week');
-        document.getElementById('week-entries-' + idx).classList.toggle('collapsed');
+      container.querySelectorAll('.week-head').forEach(function (head) {
+        head.addEventListener('click', function () {
+          head.classList.toggle('collapsed');
+          var idx = head.getAttribute('data-week');
+          document.getElementById('week-entries-' + idx).classList.toggle('collapsed');
+        });
       });
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load weekly rankings: " + escapeHtml(err.message || err), loadTop5Weekly);
+    });
+  }
+
+  function loadTop10Yearly() {
+    var container = document.getElementById('pane-yearly');
+    api('top10yearly').then(function (years) {
+      years = years || [];
+      if (!years.length) { container.innerHTML = '<div class="empty">No yearly Top 10 posted yet.</div>'; return; }
+
+      container.innerHTML = years.map(function (yr, yIdx) {
+        var collapsed = yIdx > 0; // most recent year open by default
+        return (
+          '<div class="week-block">' +
+            '<div class="week-head' + (collapsed ? ' collapsed' : '') + '" data-year="' + yIdx + '">' +
+              '<span class="arrow">&#9660;</span><h3>' + escapeHtml(yr.year) + '</h3>' +
+            '</div>' +
+            '<div class="week-entries' + (collapsed ? ' collapsed' : '') + '" id="year-entries-' + yIdx + '">' +
+              rankedListHtml(yr.entries) +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+
+      container.querySelectorAll('.week-head').forEach(function (head) {
+        head.addEventListener('click', function () {
+          head.classList.toggle('collapsed');
+          var idx = head.getAttribute('data-year');
+          document.getElementById('year-entries-' + idx).classList.toggle('collapsed');
+        });
+      });
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load yearly rankings: " + escapeHtml(err.message || err), loadTop10Yearly);
+    });
+  }
+
+  function loadPlaylists() {
+    var container = document.getElementById('pane-playlists');
+    api('playlists').then(function (list) {
+      list = list || [];
+      if (!list.length) { container.innerHTML = '<div class="empty">No playlists linked yet.</div>'; return; }
+      container.innerHTML = list.map(function (p) {
+        return (
+          '<div class="playlist-card">' +
+            '<span class="playlist-year">' + escapeHtml(p.year) + ' SONGS PLAYLIST</span>' +
+            (p.url ? '<a class="playlist-link" href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">&#9654; Open in Spotify</a>' : '<span class="date-str">No link yet</span>') +
+          '</div>'
+        );
+      }).join('');
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load playlists: " + escapeHtml(err.message || err), loadPlaylists);
+    });
+  }
+
+  function loadArtistStats() {
+    var container = document.getElementById('pane-stats');
+    api('artistStats').then(function (list) {
+      list = list || [];
+      if (!list.length) { container.innerHTML = '<div class="empty">No rankings posted yet, so there\'s nothing to count.</div>'; return; }
+      var rows = list.map(function (a) {
+        return (
+          '<tr><td>' + escapeHtml(a.artist) + '</td>' +
+          '<td class="num">' + a.weekly + '</td>' +
+          '<td class="num">' + a.yearly + '</td>' +
+          '<td class="num">' + a.total + '</td></tr>'
+        );
+      }).join('');
+      container.innerHTML =
+        '<table class="stats-table">' +
+          '<thead><tr><th>Artist</th><th>Weekly Top 5s</th><th>Yearly Top 10s</th><th>Total</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>';
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load artist stats: " + escapeHtml(err.message || err), loadArtistStats);
     });
   }
 
