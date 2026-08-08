@@ -210,6 +210,19 @@
     white-space:pre-wrap;
   }
 
+  /* ---------- artist browse pills ---------- */
+  .artist-pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel); border:2px solid var(--border);
+    padding:6px 14px 6px 6px; cursor:pointer;
+    font-family:'VT323', monospace; font-size:16px; color:var(--ink);
+    box-shadow:3px 3px 0 rgba(0,0,0,0.3);
+  }
+  .artist-pill:hover{ border-color:var(--green); color:var(--green); }
+  .artist-pill.active{ border-color:var(--amber); color:var(--amber); box-shadow:0 0 8px rgba(255,182,39,0.3); }
+  .artist-pill img{ width:26px; height:26px; border-radius:50%; object-fit:cover; background:#0a0d1c; flex-shrink:0; }
+  .artist-filter-chip{ font-family:'VT323', monospace; font-size:14px; padding:2px 8px; border:1px solid var(--amber); color:var(--amber); cursor:pointer; text-transform:uppercase; }
+
   /* ---------- releases ---------- */
   .release-day{ margin-bottom:30px; }
   .release-day-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:12px; border-bottom:2px solid var(--border); padding-bottom:8px; }
@@ -323,6 +336,8 @@
       <div class="nav-tab" data-route="encyclopedia">Encyclopedia</div>
       <div class="nav-tab" data-route="releases">Releases</div>
       <div class="nav-tab" data-route="top5">Top 5</div>
+      <div class="nav-tab" data-route="indiemonday">Indie Monday</div>
+      <div class="nav-tab" data-route="about">About</div>
     </div>
     <div class="social-links" id="social-links"></div>
   </div>
@@ -356,6 +371,16 @@
       <h3>TOP 5 OF THE WEEK</h3>
       <p>The five nerdcore songs worth your time this week, ranked.</p>
     </div>
+    <div class="home-tile" data-route="indiemonday">
+      <div class="tag">WEEKLY SPOTLIGHT</div>
+      <h3>INDIE MONDAY</h3>
+      <p>More details coming soon.</p>
+    </div>
+    <div class="home-tile" data-route="about">
+      <div class="tag">WHO'S BEHIND THIS</div>
+      <h3>ABOUT ME</h3>
+      <p>The person running the archive.</p>
+    </div>
   </div>
   <div class="home-social-section" id="home-social-section" style="display:none">
     <div class="home-social-label">FOLLOW &amp; LISTEN</div>
@@ -372,6 +397,18 @@
     <p>Every lyric page in the archive.</p>
     <input type="text" class="search-box" id="lyrics-search" placeholder="Search by song or artist&hellip;">
   </div>
+
+  <div id="artist-browse-section" style="margin-bottom:26px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div class="home-social-label" style="margin-bottom:0;">BROWSE BY ARTIST</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span id="artist-filter-chip" style="display:none;"></span>
+        <div class="nav-tab" id="artist-sort-toggle" style="font-size:9px;">SORT: A&rarr;Z</div>
+      </div>
+    </div>
+    <div id="artist-buttons-row" style="display:flex; flex-wrap:wrap; gap:10px;"><div class="loading" style="padding:16px 0;">Loading artists&hellip;</div></div>
+  </div>
+
   <div id="lyrics-list-content"><div class="loading">Loading lyrics&hellip;</div></div>
 </div>
 
@@ -439,6 +476,27 @@
   <div class="subpane" id="pane-stats"><div class="loading">Loading artist stats&hellip;</div></div>
 </div>
 
+<!-- INDIE MONDAY -->
+<div class="page" id="view-indiemonday" style="display:none">
+  <span class="back-link" data-route="home">&larr; Back to Home</span>
+  <div class="page-head">
+    <div class="eyebrow">WEEKLY SPOTLIGHT</div>
+    <h1>INDIE MONDAY</h1>
+    <p>Details coming soon.</p>
+  </div>
+  <div class="empty">This section is under construction. Check back soon!</div>
+</div>
+
+<!-- ABOUT -->
+<div class="page" id="view-about" style="display:none">
+  <span class="back-link" data-route="home">&larr; Back to Home</span>
+  <div class="page-head">
+    <div class="eyebrow">WHO'S BEHIND THIS</div>
+    <h1>ABOUT ME</h1>
+  </div>
+  <div id="about-content"><div class="loading">Loading&hellip;</div></div>
+</div>
+
 <!-- FLOATING PLAYER CONTAINER -->
 <div id="floating-player">
   <div id="floating-player-header">
@@ -452,7 +510,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw-oC-IA4f3QbAnXz-kxoolug-zkVlv4T_g7LTFDfs3TbsERXXOnlEzsWvp-NnY4z1G/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwurwPR-vd4bSX_ilPPBorbhlQPIRsuUtc964ORcdfsl61Im-SoJQYAq167mIg3bNJZ/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -520,6 +578,10 @@
   var siteSettings = { defaultImage: '', siteTitle: 'NERDCORE<br>ARCHIVE', tagline: '', social: {} };
   var allLyrics = [];
   var allWeeklyData = [];
+  var allArtists = [];
+  var artistsLoaded = false;
+  var artistSortDir = 'asc';
+  var selectedArtistFilter = null;
   var lyricsLoaded = false;
   var releasesLoaded = false;
   var top5Loaded = false;
@@ -615,7 +677,7 @@
   })();
 
   function hideAllViews() {
-    ['home','lyrics-list','lyrics-detail','encyclopedia','releases','top5'].forEach(function (v) {
+    ['home','lyrics-list','lyrics-detail','encyclopedia','releases','top5','indiemonday','about'].forEach(function (v) {
       document.getElementById('view-' + v).style.display = 'none';
     });
     document.querySelectorAll('.nav-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -669,6 +731,20 @@
     if (!top5Loaded) loadTop5();
   }
 
+  function showIndieMonday() {
+    hideAllViews();
+    document.getElementById('view-indiemonday').style.display = '';
+    setActiveTab('indiemonday');
+    setPath('indiemonday');
+  }
+  function showAbout() {
+    hideAllViews();
+    document.getElementById('view-about').style.display = '';
+    setActiveTab('about');
+    setPath('about');
+    loadAbout();
+  }
+
   function setPath(p) {
     var full = '#/' + p;
     if (window.location.hash !== full) window.history.pushState({ path: p }, '', full);
@@ -682,6 +758,8 @@
     if (path === 'encyclopedia') { showEncyclopedia(); return; }
     if (path === 'releases') { showReleases(); return; }
     if (path === 'top5') { showTop5(); return; }
+    if (path === 'indiemonday') { showIndieMonday(); return; }
+    if (path === 'about') { showAbout(); return; }
     showHome();
   }
   window.addEventListener('popstate', routeFromHash);
@@ -715,6 +793,8 @@
       else if (r === 'encyclopedia') showEncyclopedia();
       else if (r === 'releases') showReleases();
       else if (r === 'top5') showTop5();
+      else if (r === 'indiemonday') showIndieMonday();
+      else if (r === 'about') showAbout();
     });
   });
 
@@ -765,6 +845,49 @@
     }
   }
 
+  // ABOUT
+  function loadAbout() {
+    var container = document.getElementById('about-content');
+    api('settings').then(function (s) {
+      siteSettings = s || siteSettings;
+      renderSocialLinks();
+      renderAboutContent();
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load About info: " + escapeHtml(err.message || err), loadAbout);
+    });
+  }
+
+  function renderAboutContent() {
+    var container = document.getElementById('about-content');
+    var fallback = getFallbackImage();
+    var pfp = (siteSettings && siteSettings.aboutPfp) ? siteSettings.aboutPfp : fallback;
+    var bioRaw = (siteSettings && siteSettings.aboutBio) ? siteSettings.aboutBio : '';
+    var bioHtml = bioRaw ? escapeHtml(bioRaw).replace(/\n/g, '<br>') : '<i>No bio added yet.</i>';
+    var social = (siteSettings && siteSettings.social) || {};
+    var hasSocial = Object.keys(SOCIAL_LABELS).some(function (key) { return social[key]; });
+
+    container.innerHTML =
+      '<div class="detail-hero">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(pfp) + '" onerror="this.src=\'' + fallback + '\'">' +
+        '<div class="detail-hero-text">' +
+          '<div class="retro" style="font-size:19px; color:var(--ink); line-height:1.6;">' + bioHtml + '</div>' +
+        '</div>' +
+      '</div>' +
+      (hasSocial ?
+        '<div class="home-social-section" style="margin-top:0;">' +
+          '<div class="home-social-label">FOLLOW &amp; LISTEN</div>' +
+          '<div class="home-social-buttons" id="about-social-buttons"></div>' +
+        '</div>' : '');
+
+    if (hasSocial) {
+      var activeKeys = Object.keys(SOCIAL_LABELS).filter(function (key) { return social[key]; });
+      document.getElementById('about-social-buttons').innerHTML = activeKeys.map(function (key) {
+        return '<a class="social-btn" href="' + escapeHtml(social[key]) + '" target="_blank" rel="noopener">' +
+          SOCIAL_LABELS[key] + '</a>';
+      }).join('');
+    }
+  }
+
   function loadSettings() {
     api('settings').then(function (s) {
       siteSettings = s || siteSettings;
@@ -779,11 +902,104 @@
     api('lyrics').then(function (list) {
       lyricsLoaded = true;
       allLyrics = list || [];
-      renderLyricsList(allLyrics);
+      applyLyricsFilters();
+      loadArtistBrowse();
     }).catch(function (err) {
       renderErrorWithRetry(document.getElementById('lyrics-list-content'),
         "Couldn't load lyrics: " + escapeHtml(err.message || err), loadLyrics);
     });
+  }
+
+  // BROWSE BY ARTIST
+  function loadArtistBrowse() {
+    if (artistsLoaded) { renderArtistButtons(); return; }
+    api('artists').then(function (list) {
+      artistsLoaded = true;
+      allArtists = list || [];
+      renderArtistButtons();
+    }).catch(function () {
+      // Non-fatal — still show artist buttons derived from the lyrics list, just without photos.
+      artistsLoaded = true;
+      allArtists = [];
+      renderArtistButtons();
+    });
+  }
+
+  function uniqueArtistList() {
+    var pfpMap = {};
+    allArtists.forEach(function (a) {
+      pfpMap[String(a.artist || '').trim().toLowerCase()] = a.pfp;
+    });
+    var seen = {};
+    var names = [];
+    allLyrics.forEach(function (item) {
+      if (isNA(item.artist)) return;
+      var key = item.artist.trim().toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      names.push(item.artist.trim());
+    });
+    names.sort(function (a, b) {
+      return artistSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    });
+    return names.map(function (n) { return { artist: n, pfp: pfpMap[n.toLowerCase()] || '' }; });
+  }
+
+  function renderArtistButtons() {
+    var row = document.getElementById('artist-buttons-row');
+    var list = uniqueArtistList();
+    if (!list.length) { row.innerHTML = '<div class="empty" style="padding:10px 0;">No artists yet.</div>'; return; }
+    var fallback = getFallbackImage();
+    row.innerHTML = list.map(function (a) {
+      var img = a.pfp ? escapeHtml(a.pfp) : fallback;
+      var activeClass = (selectedArtistFilter && selectedArtistFilter.toLowerCase() === a.artist.toLowerCase()) ? ' active' : '';
+      return '<div class="artist-pill' + activeClass + '" data-artist="' + escapeHtml(a.artist) + '">' +
+        '<img src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' + escapeHtml(a.artist) + '</div>';
+    }).join('');
+
+    row.querySelectorAll('.artist-pill').forEach(function (pill) {
+      pill.addEventListener('click', function () {
+        var artist = pill.getAttribute('data-artist');
+        selectedArtistFilter = (selectedArtistFilter === artist) ? null : artist;
+        document.getElementById('lyrics-search').value = '';
+        applyLyricsFilters();
+        renderArtistButtons();
+        renderArtistFilterChip();
+      });
+    });
+  }
+
+  function renderArtistFilterChip() {
+    var chip = document.getElementById('artist-filter-chip');
+    if (selectedArtistFilter) {
+      chip.style.display = '';
+      chip.innerHTML = '<span class="artist-filter-chip" id="clear-artist-filter">Showing: ' + escapeHtml(selectedArtistFilter) + ' &times;</span>';
+      document.getElementById('clear-artist-filter').addEventListener('click', function () {
+        selectedArtistFilter = null;
+        applyLyricsFilters();
+        renderArtistButtons();
+        renderArtistFilterChip();
+      });
+    } else {
+      chip.style.display = 'none';
+      chip.innerHTML = '';
+    }
+  }
+
+  document.getElementById('artist-sort-toggle').addEventListener('click', function () {
+    artistSortDir = artistSortDir === 'asc' ? 'desc' : 'asc';
+    this.innerHTML = artistSortDir === 'asc' ? 'SORT: A&rarr;Z' : 'SORT: Z&rarr;A';
+    renderArtistButtons();
+  });
+
+  function applyLyricsFilters() {
+    var q = document.getElementById('lyrics-search').value.trim().toLowerCase();
+    var filtered = allLyrics.filter(function (i) {
+      var matchesQuery = !q || (String(i.title || '') + ' ' + String(i.artist || '')).toLowerCase().indexOf(q) !== -1;
+      var matchesArtist = !selectedArtistFilter || String(i.artist || '').trim().toLowerCase() === selectedArtistFilter.toLowerCase();
+      return matchesQuery && matchesArtist;
+    });
+    renderLyricsList(filtered);
   }
 
   function renderLyricsList(list) {
@@ -823,11 +1039,7 @@
   }
 
   document.getElementById('lyrics-search').addEventListener('input', function () {
-    var q = this.value.trim().toLowerCase();
-    var filtered = !q ? allLyrics : allLyrics.filter(function (i) {
-      return (String(i.title || '') + ' ' + String(i.artist || '')).toLowerCase().indexOf(q) !== -1;
-    });
-    renderLyricsList(filtered);
+    applyLyricsFilters();
   });
 
   function loadLyricDetail(id) {
