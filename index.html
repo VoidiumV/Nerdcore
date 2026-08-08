@@ -169,7 +169,6 @@
   .badge{ font-family:'VT323', monospace; font-size:14px; padding:2px 8px; border:1px solid; text-transform:uppercase; }
   .badge.locked{ color:#ff6b6b; border-color:#ff6b6b; }
   .badge.upcoming{ color:var(--amber); border-color:var(--amber); }
-  .genre-chip{ font-family:'VT323', monospace; font-size:14px; color:var(--green); border:1px solid var(--green); padding:1px 7px; }
   .date-str{ font-family:'VT323', monospace; font-size:15px; color:var(--muted-dim); }
 
   /* ---------- detail ---------- */
@@ -180,10 +179,6 @@
   }
   .detail-hero-img{ width:220px; height:220px; object-fit:cover; flex-shrink:0; border-right:3px solid var(--border); background:#0a0d1c; }
   .detail-hero-text{ flex:1; min-width:0; padding:26px 26px; display:flex; flex-direction:column; justify-content:center; }
-  .tag-pill{
-    display:inline-flex; align-items:center; gap:6px; background:var(--border); color:var(--green);
-    border-radius:999px; padding:4px 12px; font-family:'VT323',monospace; font-size:15px; text-transform:uppercase; margin-bottom:12px; width:fit-content;
-  }
   .detail-title{ font-family:'Press Start 2P', monospace; font-size:20px; color:var(--ink); text-shadow:2px 2px 0 var(--magenta); margin:0 0 10px; line-height:1.6; }
   .detail-meta{ display:flex; flex-wrap:wrap; gap:14px; font-family:'VT323',monospace; font-size:17px; color:var(--muted); }
   .detail-meta b{ color:var(--ink); }
@@ -223,7 +218,7 @@
   .artist-card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 rgba(0,0,0,0.4); border-color:var(--green); }
   .artist-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; background:#0a0d1c; border-bottom:3px solid var(--border); display:block; }
   .artist-card .name{ font-family:'Press Start 2P', monospace; font-size:12px; color:var(--green); padding:12px 10px; text-align:center; line-height:1.6; }
-  .sort-arrow{ font-family:'VT323', monospace; font-size:20px; line-height:1; vertical-align:middle; padding:0 2px; }
+  .sort-arrow{ font-family:'VT323', monospace; font-size:20px; line-height:1; vertical-align:middle; padding:0 2px; position:relative; top:-3px; }
 
   /* ---------- releases ---------- */
   .release-day{ margin-bottom:30px; }
@@ -507,7 +502,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxH5ZOGWGWJ4Vw-6Ru22pwDAfcAzxFglM1UzCoe8jF8xb0NJLKafxOV1OLocPNvgnyd/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwIWd83d1DT80WH6DEW2NbKw4nejje983r9EQvNhjuCq6bozja24LHKl_L9v9syFozO/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -580,6 +575,7 @@
   var artistSortDir = 'asc';
   var artistSearchQuery = '';
   var currentArtistDetail = null;
+  var artistDetailSortDir = 'asc';
   var lyricsLoaded = false;
   var releasesLoaded = false;
   var top5Loaded = false;
@@ -706,6 +702,7 @@
     setActiveTab('lyrics');
     setPath('artist-' + encodeURIComponent(name));
     currentArtistDetail = name;
+    artistDetailSortDir = 'asc';
     if (!lyricsLoaded) {
       document.getElementById('artist-detail-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
       api('lyrics').then(function (list) {
@@ -954,8 +951,11 @@
   // each one gets their own profile (and no joint "A & B" profile is ever created).
   function uniqueArtistList() {
     var pfpMap = {};
+    var hiddenMap = {};
     allArtists.forEach(function (a) {
-      pfpMap[String(a.artist || '').trim().toLowerCase()] = a.pfp;
+      var key = String(a.artist || '').trim().toLowerCase();
+      pfpMap[key] = a.pfp;
+      if (a.hidden) hiddenMap[key] = true;
     });
     var seen = {};
     var names = [];
@@ -965,6 +965,11 @@
         var key = name.toLowerCase();
         if (seen[key]) return;
         seen[key] = true;
+        // Hidden artists (Is Hidden = TRUE on the Artists tab) don't get
+        // their own profile card here — but this only skips adding
+        // *this* name to the grid; their songs still appear normally on
+        // any co-credited artist's page.
+        if (hiddenMap[key]) return;
         names.push(name);
       });
     });
@@ -1025,6 +1030,11 @@
       });
     });
 
+    songs = songs.slice().sort(function (a, b) {
+      var cmp = String(a.title || '').localeCompare(String(b.title || ''));
+      return artistDetailSortDir === 'asc' ? cmp : -cmp;
+    });
+
     var header =
       '<div class="detail-hero">' +
         '<img class="detail-hero-img" src="' + escapeHtml(pfp) + '" onerror="this.src=\'' + fallback + '\'">' +
@@ -1039,28 +1049,40 @@
       return;
     }
 
+    var sortFirst = artistDetailSortDir === 'asc' ? 'A' : 'Z';
+    var sortSecond = artistDetailSortDir === 'asc' ? 'Z' : 'A';
+    var sortRow =
+      '<div style="display:flex; justify-content:flex-end; margin-bottom:16px;">' +
+        '<div class="nav-tab" id="artist-detail-sort-toggle">SORT: ' + sortFirst + '<span class="sort-arrow">&#8594;</span>' + sortSecond + '</div>' +
+      '</div>';
+
     var cardsHtml = songs.map(function (item) {
       var img = item.cover ? escapeHtml(item.cover) : fallback;
       var lockedClass = item.isLocked ? ' locked' : '';
       var badge = item.isLocked ? '<span class="badge locked">Locked</span>' :
         (item.isUpcoming ? '<span class="badge upcoming">Upcoming</span>' : '');
-      var genreChips = (item.genre || []).slice(0, 3).map(function (g) {
-        return '<span class="genre-chip">' + escapeHtml(g) + '</span>';
-      }).join('');
       return (
         '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
           '<img class="lyric-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
           '<div class="lyric-body">' +
             '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
             '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
-            '<div class="lyric-meta-row">' + badge + genreChips + '</div>' +
+            '<div class="lyric-meta-row">' + badge + '</div>' +
             '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
           '</div>' +
         '</div>'
       );
     }).join('');
 
-    container.innerHTML = header + cardsHtml;
+    container.innerHTML = header + sortRow + cardsHtml;
+
+    var sortToggle = document.getElementById('artist-detail-sort-toggle');
+    if (sortToggle) {
+      sortToggle.addEventListener('click', function () {
+        artistDetailSortDir = artistDetailSortDir === 'asc' ? 'desc' : 'asc';
+        renderArtistDetail(name);
+      });
+    }
 
     container.querySelectorAll('.lyric-card').forEach(function (card) {
       card.addEventListener('click', function () {
@@ -1089,9 +1111,6 @@
 
     var fallback = getFallbackImage();
     var img = post.cover || fallback;
-    var genreChips = (post.genre || []).map(function (g) {
-      return '<span class="tag-pill">' + escapeHtml(g) + '</span>';
-    }).join(' ');
 
     var streamBtns = '';
     if (post.spotify) streamBtns += '<a class="stream-btn spotify" href="' + escapeHtml(post.spotify) + '" target="_blank" rel="noopener">&#9654; Spotify</a>';
@@ -1102,7 +1121,6 @@
       '<div class="detail-hero">' +
         '<img class="detail-hero-img" src="' + escapeHtml(img) + '" onerror="this.src=\'' + fallback + '\'">' +
         '<div class="detail-hero-text">' +
-          (genreChips ? '<div style="margin-bottom:10px;">' + genreChips + '</div>' : '') +
           '<h1 class="detail-title">' + escapeHtml(post.title) + '</h1>' +
           '<div class="detail-meta"><span>by <b>' + escapeHtml(post.artist) + '</b></span><span>' + escapeHtml(post.dateStr) + '</span></div>' +
         '</div>' +
