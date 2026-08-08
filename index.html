@@ -6,7 +6,7 @@
 <title>Nerdcore Archive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -200,9 +200,18 @@
 
   .lyrics-content{
     background:var(--panel-2); border:1px solid var(--border);
-    padding:22px 24px; font-family:'Space Mono', monospace;
-    font-size:16px; line-height:1.9; color:var(--ink);
-    white-space:pre-wrap;
+    padding:22px 24px; font-family:'JetBrains Mono', 'Space Mono', monospace;
+    font-size:17px; line-height:1.85; color:var(--ink); font-weight:400;
+  }
+  .lyrics-content p{ margin:0 0 6px; }
+  .lyrics-content .lyrics-header{
+    margin:20px 0 8px; font-family:'Press Start 2P', monospace; font-size:11px;
+    color:var(--muted); letter-spacing:0.5px; line-height:1.8;
+  }
+  .lyrics-content .lyrics-header:first-child{ margin-top:0; }
+  .lyrics-content .lyrics-cue{
+    margin:14px 0 4px; font-family:'Press Start 2P', monospace; font-size:10px;
+    letter-spacing:1px; text-transform:uppercase;
   }
 
   /* ---------- artist profile grid ---------- */
@@ -229,11 +238,10 @@
   .release-card{ background:var(--panel); border:2px solid var(--border); padding:10px; display:flex; gap:10px; align-items:center; box-shadow:3px 3px 0 rgba(0,0,0,0.3); }
   .release-cover{ width:52px; height:52px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; background:#0a0d1c; }
   .release-info{ min-width:0; }
-  .release-song{ font-family:'VT323', monospace; font-size:17px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .release-song{ font-family:'VT323', monospace; font-size:17px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   .release-artist{ font-family:'VT323', monospace; font-size:15px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .release-links{ display:flex; gap:6px; margin-top:3px; }
-  .release-links a{ font-size:13px; text-decoration:none; color:var(--muted-dim); border-bottom:1px dotted var(--muted-dim); }
-  .release-links a:hover{ color:var(--green); border-color:var(--green); }
+  .release-song-link{ cursor:pointer; text-decoration:none; }
+  .release-song-link:hover{ color:var(--green); text-decoration:underline; }
 
   /* ---------- subtabs ---------- */
   .subtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:24px; }
@@ -502,7 +510,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwIWd83d1DT80WH6DEW2NbKw4nejje983r9EQvNhjuCq6bozja24LHKl_L9v9syFozO/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwcbsal8anthC-tq39ILS_cLo4DNizCVLkmDGhMkbuxI0THrwOW2vTUimqBOU8VdTV5/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1161,17 +1169,24 @@
       var items = byDate[dateKey];
       var cards = items.map(function (item) {
         var img = item.cover ? escapeHtml(item.cover) : fallback;
-        var links = [];
-        if (item.spotify) links.push('<a href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">Spotify</a>');
-        if (item.apple) links.push('<a href="' + escapeHtml(item.apple) + '" target="_blank" rel="noopener">Apple Music</a>');
-        if (item.youtube) links.push('<a href="javascript:void(0)" onclick="openFloatingPlayer(\'' + escapeHtml(item.youtube) + '\')">YouTube</a>');
+        var titleText = escapeHtml(item.title);
+        var songHtml;
+        if (item.youtube) {
+          // Prefer YouTube — embeds inline in the floating player, same as Top 5.
+          songHtml = '<a class="release-song release-song-link" href="javascript:void(0)" onclick="openFloatingPlayer(\'' + escapeHtml(item.youtube) + '\')">' + titleText + '</a>';
+        } else if (item.spotify) {
+          songHtml = '<a class="release-song release-song-link" href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">' + titleText + '</a>';
+        } else if (item.apple) {
+          songHtml = '<a class="release-song release-song-link" href="' + escapeHtml(item.apple) + '" target="_blank" rel="noopener">' + titleText + '</a>';
+        } else {
+          songHtml = '<div class="release-song">' + titleText + '</div>';
+        }
         return (
           '<div class="release-card">' +
             '<img class="release-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
             '<div class="release-info">' +
-              '<div class="release-song">' + escapeHtml(item.title) + '</div>' +
+              songHtml +
               '<div class="release-artist">' + escapeHtml(item.artist) + '</div>' +
-              (links.length ? '<div class="release-links">' + links.join('') + '</div>' : '') +
             '</div>' +
           '</div>'
         );
