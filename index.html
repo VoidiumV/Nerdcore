@@ -324,6 +324,39 @@
     background:
       linear-gradient(135deg, transparent 0 50%, var(--green) 50% 58%, transparent 58% 66%, var(--green) 66% 74%, transparent 74% 82%, var(--green) 82% 90%, transparent 90% 100%);
   }
+
+  /* ---------- report-an-issue button + modal ---------- */
+  .report-btn-row{ display:flex; justify-content:center; margin-top:22px; }
+  .report-btn-row .nav-tab{ color:var(--muted-dim); border-color:var(--border); }
+  .report-btn-row .nav-tab:hover{ color:var(--magenta); border-color:var(--magenta); }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:10000;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{
+    background:var(--panel-2); border:3px solid var(--border);
+    box-shadow:6px 6px 0 rgba(0,0,0,0.4); max-width:480px; width:100%; padding:26px;
+  }
+  .modal-box h3{
+    font-family:'Press Start 2P', monospace; font-size:14px; color:var(--ink);
+    text-shadow:2px 2px 0 var(--magenta); margin:0 0 14px; line-height:1.6;
+  }
+  .modal-box p{ font-family:'VT323', monospace; font-size:19px; color:var(--muted); margin:0 0 14px; line-height:1.5; }
+  .modal-box textarea{
+    width:100%; min-height:110px; font-family:'JetBrains Mono', monospace; font-size:14px;
+    background:var(--panel); border:2px solid var(--border); color:var(--ink);
+    padding:10px; resize:vertical; outline:none; box-sizing:border-box;
+  }
+  .modal-box textarea:focus{ border-color:var(--green); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
+  .modal-btn{
+    font-family:'Press Start 2P', monospace; font-size:10px; padding:11px 16px;
+    cursor:pointer; border:2px solid var(--border); background:var(--panel); color:var(--muted);
+  }
+  .modal-btn.primary{ color:var(--green); border-color:var(--green); }
+  .modal-btn.primary:hover{ box-shadow:3px 3px 0 rgba(0,0,0,0.4); }
 </style>
 </head>
 <body>
@@ -509,8 +542,21 @@
   <div id="floating-player-resize-handle" title="Drag to resize"></div>
 </div>
 
+<!-- BUG / QUALITY REPORT MODAL -->
+<div class="modal-overlay" id="bug-report-overlay">
+  <div class="modal-box">
+    <h3>REPORT AN ISSUE</h3>
+    <p>Something off with this page &mdash; wrong lyrics, wrong audio link, wrong artist, etc? Totally optional to explain what it is, I'll figure it out.</p>
+    <textarea id="bug-report-text" placeholder="(optional) what's wrong&hellip;"></textarea>
+    <div class="modal-actions">
+      <div class="modal-btn" id="bug-report-cancel">CANCEL</div>
+      <div class="modal-btn primary" id="bug-report-submit">SUBMIT</div>
+    </div>
+  </div>
+</div>
+
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwcbsal8anthC-tq39ILS_cLo4DNizCVLkmDGhMkbuxI0THrwOW2vTUimqBOU8VdTV5/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwTXD9HbFjtk5g2nAB70wx3U1VeRtU5pIVOc1qWGtCaHjL6VBUOYsRGa-izk1S9a0U6/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -591,6 +637,7 @@
 
   // FLOATING PLAYER LOGIC
   function openFloatingPlayer(url) {
+    if (!url) return;
     var player = document.getElementById('floating-player');
     var iframe = document.getElementById('floating-player-iframe');
     iframe.src = url;
@@ -602,6 +649,41 @@
     var iframe = document.getElementById('floating-player-iframe');
     iframe.src = '';
     player.style.display = 'none';
+  });
+
+  // BUG / QUALITY REPORT MODAL
+  var bugReportContext = null;
+
+  function openBugReportModal(context) {
+    bugReportContext = context || {};
+    document.getElementById('bug-report-text').value = '';
+    document.getElementById('bug-report-submit').textContent = 'SUBMIT';
+    document.getElementById('bug-report-overlay').classList.add('open');
+  }
+  function closeBugReportModal() {
+    document.getElementById('bug-report-overlay').classList.remove('open');
+    bugReportContext = null;
+  }
+
+  document.getElementById('bug-report-cancel').addEventListener('click', closeBugReportModal);
+  document.getElementById('bug-report-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeBugReportModal();
+  });
+  document.getElementById('bug-report-submit').addEventListener('click', function () {
+    var btn = this;
+    var message = document.getElementById('bug-report-text').value.trim();
+    btn.textContent = 'SENDING…';
+    api('reportBug', {
+      songId: (bugReportContext && bugReportContext.id) || '',
+      songTitle: (bugReportContext && bugReportContext.title) || '',
+      artist: (bugReportContext && bugReportContext.artist) || '',
+      message: message
+    }).then(function () {
+      closeBugReportModal();
+    }).catch(function () {
+      btn.textContent = 'SUBMIT';
+      alert("Couldn't send the report — try again in a bit.");
+    });
   });
 
   // DRAGGABLE SCRIPT
@@ -1134,7 +1216,15 @@
         '</div>' +
       '</div>' +
       (streamBtns ? '<div class="stream-row">' + streamBtns + '</div>' : '') +
-      '<div class="lyrics-content">' + (post.contentHtml || '<p><i>No lyrics added yet.</i></p>') + '</div>';
+      '<div class="lyrics-content">' + (post.contentHtml || '<p><i>No lyrics added yet.</i></p>') + '</div>' +
+      '<div class="report-btn-row"><span class="nav-tab" id="lyric-report-btn">&#9873; REPORT AN ISSUE</span></div>';
+
+    var reportBtn = document.getElementById('lyric-report-btn');
+    if (reportBtn) {
+      reportBtn.addEventListener('click', function () {
+        openBugReportModal({ id: post.id, title: post.title, artist: post.artist });
+      });
+    }
   }
 
   // RELEASES
