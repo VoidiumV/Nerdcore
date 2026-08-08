@@ -210,18 +210,20 @@
     white-space:pre-wrap;
   }
 
-  /* ---------- artist browse pills ---------- */
-  .artist-pill{
-    display:flex; align-items:center; gap:8px;
-    background:var(--panel); border:2px solid var(--border);
-    padding:6px 14px 6px 6px; cursor:pointer;
-    font-family:'VT323', monospace; font-size:16px; color:var(--ink);
-    box-shadow:3px 3px 0 rgba(0,0,0,0.3);
+  /* ---------- artist profile grid ---------- */
+  .artist-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  @media(max-width:900px){ .artist-grid{ grid-template-columns:repeat(3,1fr); } }
+  @media(max-width:620px){ .artist-grid{ grid-template-columns:repeat(2,1fr); } }
+  .artist-card{
+    background:var(--panel); border:3px solid var(--border);
+    box-shadow:5px 5px 0 rgba(0,0,0,0.35); cursor:pointer; overflow:hidden;
+    display:flex; flex-direction:column;
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
   }
-  .artist-pill:hover{ border-color:var(--green); color:var(--green); }
-  .artist-pill.active{ border-color:var(--amber); color:var(--amber); box-shadow:0 0 8px rgba(255,182,39,0.3); }
-  .artist-pill img{ width:26px; height:26px; border-radius:50%; object-fit:cover; background:#0a0d1c; flex-shrink:0; }
-  .artist-filter-chip{ font-family:'VT323', monospace; font-size:14px; padding:2px 8px; border:1px solid var(--amber); color:var(--amber); cursor:pointer; text-transform:uppercase; }
+  .artist-card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 rgba(0,0,0,0.4); border-color:var(--green); }
+  .artist-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; background:#0a0d1c; border-bottom:3px solid var(--border); display:block; }
+  .artist-card .name{ font-family:'Press Start 2P', monospace; font-size:12px; color:var(--green); padding:12px 10px; text-align:center; line-height:1.6; }
+  .sort-arrow{ font-family:'VT323', monospace; font-size:20px; line-height:1; vertical-align:middle; padding:0 2px; }
 
   /* ---------- releases ---------- */
   .release-day{ margin-bottom:30px; }
@@ -336,8 +338,6 @@
       <div class="nav-tab" data-route="encyclopedia">Encyclopedia</div>
       <div class="nav-tab" data-route="releases">Releases</div>
       <div class="nav-tab" data-route="top5">Top 5</div>
-      <div class="nav-tab" data-route="indiemonday">Indie Monday</div>
-      <div class="nav-tab" data-route="about">About</div>
     </div>
     <div class="social-links" id="social-links"></div>
   </div>
@@ -388,33 +388,30 @@
   </div>
 </div>
 
-<!-- LYRICS LIST -->
+<!-- LYRICS = ARTIST PROFILE GRID -->
 <div class="page" id="view-lyrics-list" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
     <div class="eyebrow">BROWSE</div>
     <h1>LYRICS</h1>
-    <p>Every lyric page in the archive.</p>
-    <input type="text" class="search-box" id="lyrics-search" placeholder="Search by song or artist&hellip;">
+    <p>Pick an artist to see their tracks.</p>
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
   </div>
-
-  <div id="artist-browse-section" style="margin-bottom:26px;">
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-      <div class="home-social-label" style="margin-bottom:0;">BROWSE BY ARTIST</div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span id="artist-filter-chip" style="display:none;"></span>
-        <div class="nav-tab" id="artist-sort-toggle" style="font-size:9px;">SORT: A&rarr;Z</div>
-      </div>
-    </div>
-    <div id="artist-buttons-row" style="display:flex; flex-wrap:wrap; gap:10px;"><div class="loading" style="padding:16px 0;">Loading artists&hellip;</div></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
+    <div class="nav-tab" id="artist-sort-toggle">SORT: A<span class="sort-arrow">&#8594;</span>Z</div>
   </div>
+  <div id="artist-grid-content"><div class="loading">Loading artists&hellip;</div></div>
+</div>
 
-  <div id="lyrics-list-content"><div class="loading">Loading lyrics&hellip;</div></div>
+<!-- ARTIST DETAIL (that artist's songs) -->
+<div class="page" id="view-artist-detail" style="display:none">
+  <span class="back-link" data-route="lyrics">&larr; All Artists</span>
+  <div id="artist-detail-content"><div class="loading">Loading&hellip;</div></div>
 </div>
 
 <!-- LYRICS DETAIL -->
 <div class="page" id="view-lyrics-detail" style="display:none">
-  <span class="back-link" data-route="lyrics">&larr; All Lyrics</span>
+  <span class="back-link" id="lyric-detail-back">&larr; Back</span>
   <div id="lyrics-detail-content"><div class="loading">Loading lyrics&hellip;</div></div>
 </div>
 
@@ -510,7 +507,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwurwPR-vd4bSX_ilPPBorbhlQPIRsuUtc964ORcdfsl61Im-SoJQYAq167mIg3bNJZ/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxH5ZOGWGWJ4Vw-6Ru22pwDAfcAzxFglM1UzCoe8jF8xb0NJLKafxOV1OLocPNvgnyd/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -581,7 +578,8 @@
   var allArtists = [];
   var artistsLoaded = false;
   var artistSortDir = 'asc';
-  var selectedArtistFilter = null;
+  var artistSearchQuery = '';
+  var currentArtistDetail = null;
   var lyricsLoaded = false;
   var releasesLoaded = false;
   var top5Loaded = false;
@@ -677,7 +675,7 @@
   })();
 
   function hideAllViews() {
-    ['home','lyrics-list','lyrics-detail','encyclopedia','releases','top5','indiemonday','about'].forEach(function (v) {
+    ['home','lyrics-list','lyrics-detail','artist-detail','encyclopedia','releases','top5','indiemonday','about'].forEach(function (v) {
       document.getElementById('view-' + v).style.display = 'none';
     });
     document.querySelectorAll('.nav-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -699,7 +697,28 @@
     document.getElementById('view-lyrics-list').style.display = '';
     setActiveTab('lyrics');
     setPath('lyrics');
-    if (!lyricsLoaded) loadLyrics();
+    currentArtistDetail = null;
+    if (!lyricsLoaded) loadLyrics(); else loadArtistsData();
+  }
+  function showArtistDetail(name) {
+    hideAllViews();
+    document.getElementById('view-artist-detail').style.display = '';
+    setActiveTab('lyrics');
+    setPath('artist-' + encodeURIComponent(name));
+    currentArtistDetail = name;
+    if (!lyricsLoaded) {
+      document.getElementById('artist-detail-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
+      api('lyrics').then(function (list) {
+        lyricsLoaded = true;
+        allLyrics = list || [];
+        renderArtistDetail(name);
+      }).catch(function (err) {
+        renderErrorWithRetry(document.getElementById('artist-detail-content'),
+          "Couldn't load songs: " + escapeHtml(err.message || err), function () { showArtistDetail(name); });
+      });
+    } else {
+      renderArtistDetail(name);
+    }
   }
   function showLyricsDetail(id) {
     hideAllViews();
@@ -754,6 +773,7 @@
     var path = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
     if (!path || path === 'home') { showHome(); return; }
     if (path === 'lyrics') { showLyricsList(); return; }
+    if (path.indexOf('artist-') === 0) { showArtistDetail(decodeURIComponent(path.slice(7))); return; }
     if (path.indexOf('lyric-') === 0) { showLyricsDetail(path.slice(6)); return; }
     if (path === 'encyclopedia') { showEncyclopedia(); return; }
     if (path === 'releases') { showReleases(); return; }
@@ -897,34 +917,41 @@
     }).catch(function () { });
   }
 
-  // LYRICS
+  // LYRICS = ARTIST PROFILES
+  function splitArtistNames(raw) {
+    if (!raw) return [];
+    var parts = String(raw).split(/,|\s+&\s+|\s+x\s+|\s+vs\.?\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+with\s+/i);
+    return parts.map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+  }
+
   function loadLyrics() {
     api('lyrics').then(function (list) {
       lyricsLoaded = true;
       allLyrics = list || [];
-      applyLyricsFilters();
-      loadArtistBrowse();
+      loadArtistsData();
     }).catch(function (err) {
-      renderErrorWithRetry(document.getElementById('lyrics-list-content'),
+      renderErrorWithRetry(document.getElementById('artist-grid-content'),
         "Couldn't load lyrics: " + escapeHtml(err.message || err), loadLyrics);
     });
   }
 
-  // BROWSE BY ARTIST
-  function loadArtistBrowse() {
-    if (artistsLoaded) { renderArtistButtons(); return; }
+  function loadArtistsData() {
+    if (artistsLoaded) { renderArtistGrid(); return; }
     api('artists').then(function (list) {
       artistsLoaded = true;
       allArtists = list || [];
-      renderArtistButtons();
+      renderArtistGrid();
     }).catch(function () {
-      // Non-fatal — still show artist buttons derived from the lyrics list, just without photos.
+      // Non-fatal — the grid still works from the lyrics data alone, just without photos.
       artistsLoaded = true;
       allArtists = [];
-      renderArtistButtons();
+      renderArtistGrid();
     });
   }
 
+  // Builds the unique, de-duplicated artist list — splitting combined
+  // credits like "Daddyphatsnaps & OmarCameUp" into separate artists so
+  // each one gets their own profile (and no joint "A & B" profile is ever created).
   function uniqueArtistList() {
     var pfpMap = {};
     allArtists.forEach(function (a) {
@@ -934,81 +961,85 @@
     var names = [];
     allLyrics.forEach(function (item) {
       if (isNA(item.artist)) return;
-      var key = item.artist.trim().toLowerCase();
-      if (seen[key]) return;
-      seen[key] = true;
-      names.push(item.artist.trim());
+      splitArtistNames(item.artist).forEach(function (name) {
+        var key = name.toLowerCase();
+        if (seen[key]) return;
+        seen[key] = true;
+        names.push(name);
+      });
     });
+    var q = artistSearchQuery.trim().toLowerCase();
+    if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
     names.sort(function (a, b) {
       return artistSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     });
     return names.map(function (n) { return { artist: n, pfp: pfpMap[n.toLowerCase()] || '' }; });
   }
 
-  function renderArtistButtons() {
-    var row = document.getElementById('artist-buttons-row');
+  function renderArtistGrid() {
+    var container = document.getElementById('artist-grid-content');
     var list = uniqueArtistList();
-    if (!list.length) { row.innerHTML = '<div class="empty" style="padding:10px 0;">No artists yet.</div>'; return; }
+    if (!list.length) { container.innerHTML = '<div class="empty">No artists found.</div>'; return; }
     var fallback = getFallbackImage();
-    row.innerHTML = list.map(function (a) {
+    container.innerHTML = '<div class="artist-grid">' + list.map(function (a) {
       var img = a.pfp ? escapeHtml(a.pfp) : fallback;
-      var activeClass = (selectedArtistFilter && selectedArtistFilter.toLowerCase() === a.artist.toLowerCase()) ? ' active' : '';
-      return '<div class="artist-pill' + activeClass + '" data-artist="' + escapeHtml(a.artist) + '">' +
-        '<img src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' + escapeHtml(a.artist) + '</div>';
-    }).join('');
+      return (
+        '<div class="artist-card" data-artist="' + escapeHtml(a.artist) + '">' +
+          '<img src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
+          '<div class="name">' + escapeHtml(a.artist) + '</div>' +
+        '</div>'
+      );
+    }).join('') + '</div>';
 
-    row.querySelectorAll('.artist-pill').forEach(function (pill) {
-      pill.addEventListener('click', function () {
-        var artist = pill.getAttribute('data-artist');
-        selectedArtistFilter = (selectedArtistFilter === artist) ? null : artist;
-        document.getElementById('lyrics-search').value = '';
-        applyLyricsFilters();
-        renderArtistButtons();
-        renderArtistFilterChip();
+    container.querySelectorAll('.artist-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        showArtistDetail(card.getAttribute('data-artist'));
       });
     });
   }
 
-  function renderArtistFilterChip() {
-    var chip = document.getElementById('artist-filter-chip');
-    if (selectedArtistFilter) {
-      chip.style.display = '';
-      chip.innerHTML = '<span class="artist-filter-chip" id="clear-artist-filter">Showing: ' + escapeHtml(selectedArtistFilter) + ' &times;</span>';
-      document.getElementById('clear-artist-filter').addEventListener('click', function () {
-        selectedArtistFilter = null;
-        applyLyricsFilters();
-        renderArtistButtons();
-        renderArtistFilterChip();
-      });
-    } else {
-      chip.style.display = 'none';
-      chip.innerHTML = '';
-    }
-  }
+  document.getElementById('artist-search').addEventListener('input', function () {
+    artistSearchQuery = this.value;
+    renderArtistGrid();
+  });
 
   document.getElementById('artist-sort-toggle').addEventListener('click', function () {
     artistSortDir = artistSortDir === 'asc' ? 'desc' : 'asc';
-    this.innerHTML = artistSortDir === 'asc' ? 'SORT: A&rarr;Z' : 'SORT: Z&rarr;A';
-    renderArtistButtons();
+    var first = artistSortDir === 'asc' ? 'A' : 'Z';
+    var second = artistSortDir === 'asc' ? 'Z' : 'A';
+    this.innerHTML = 'SORT: ' + first + '<span class="sort-arrow">&#8594;</span>' + second;
+    renderArtistGrid();
   });
 
-  function applyLyricsFilters() {
-    var q = document.getElementById('lyrics-search').value.trim().toLowerCase();
-    var filtered = allLyrics.filter(function (i) {
-      var matchesQuery = !q || (String(i.title || '') + ' ' + String(i.artist || '')).toLowerCase().indexOf(q) !== -1;
-      var matchesArtist = !selectedArtistFilter || String(i.artist || '').trim().toLowerCase() === selectedArtistFilter.toLowerCase();
-      return matchesQuery && matchesArtist;
-    });
-    renderLyricsList(filtered);
-  }
-
-  function renderLyricsList(list) {
-    var container = document.getElementById('lyrics-list-content');
-    var valid = (list || []).filter(function (i) { return !isNA(i.artist) && !isNA(i.title); });
-    if (!valid.length) { container.innerHTML = '<div class="empty">No lyrics posted yet.</div>'; return; }
+  function renderArtistDetail(name) {
+    var container = document.getElementById('artist-detail-content');
+    var pfpEntry = allArtists.filter(function (a) {
+      return String(a.artist || '').trim().toLowerCase() === name.toLowerCase();
+    })[0];
     var fallback = getFallbackImage();
+    var pfp = (pfpEntry && pfpEntry.pfp) ? pfpEntry.pfp : fallback;
 
-    container.innerHTML = valid.map(function (item) {
+    var songs = allLyrics.filter(function (item) {
+      return !isNA(item.artist) && splitArtistNames(item.artist).some(function (n) {
+        return n.toLowerCase() === name.toLowerCase();
+      });
+    });
+
+    var header =
+      '<div class="detail-hero">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(pfp) + '" onerror="this.src=\'' + fallback + '\'">' +
+        '<div class="detail-hero-text">' +
+          '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
+          '<div class="detail-meta"><span>' + songs.length + (songs.length === 1 ? ' song' : ' songs') + '</span></div>' +
+        '</div>' +
+      '</div>';
+
+    if (!songs.length) {
+      container.innerHTML = header + '<div class="empty">No songs posted for this artist yet.</div>';
+      return;
+    }
+
+    var cardsHtml = songs.map(function (item) {
       var img = item.cover ? escapeHtml(item.cover) : fallback;
       var lockedClass = item.isLocked ? ' locked' : '';
       var badge = item.isLocked ? '<span class="badge locked">Locked</span>' :
@@ -1016,7 +1047,6 @@
       var genreChips = (item.genre || []).slice(0, 3).map(function (g) {
         return '<span class="genre-chip">' + escapeHtml(g) + '</span>';
       }).join('');
-
       return (
         '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
           '<img class="lyric-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
@@ -1030,6 +1060,8 @@
       );
     }).join('');
 
+    container.innerHTML = header + cardsHtml;
+
     container.querySelectorAll('.lyric-card').forEach(function (card) {
       card.addEventListener('click', function () {
         if (card.getAttribute('data-locked') === 'true') return;
@@ -1038,8 +1070,9 @@
     });
   }
 
-  document.getElementById('lyrics-search').addEventListener('input', function () {
-    applyLyricsFilters();
+  document.getElementById('lyric-detail-back').addEventListener('click', function () {
+    if (currentArtistDetail) showArtistDetail(currentArtistDetail);
+    else showLyricsList();
   });
 
   function loadLyricDetail(id) {
