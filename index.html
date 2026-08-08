@@ -136,6 +136,21 @@
   .home-tile p{ font-size:15px; color:var(--muted); margin:0; line-height:1.5; }
   @media(max-width:600px){ .home-grid{ grid-template-columns:1fr; } }
 
+  .home-social-section{ margin-top:28px; }
+  .home-social-label{
+    font-family:'Press Start 2P', monospace; font-size:9px;
+    color:var(--amber); letter-spacing:1px; margin-bottom:14px;
+  }
+  .home-social-buttons{ display:flex; flex-wrap:wrap; gap:10px; }
+  .social-btn{
+    font-family:'Press Start 2P', monospace; font-size:9px;
+    background:var(--panel); color:var(--green); border:2px solid var(--green);
+    padding:12px 16px; text-decoration:none; cursor:pointer;
+    box-shadow:3px 3px 0 rgba(0,0,0,0.4); letter-spacing:0.5px;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .social-btn:hover{ transform:translate(-2px,-2px); box-shadow:5px 5px 0 rgba(0,0,0,0.4); }
+
   /* ---------- lyrics cards ---------- */
   .lyric-card{
     display:flex; gap:0; align-items:stretch;
@@ -333,6 +348,10 @@
       <p>The five nerdcore songs worth your time this week, ranked.</p>
     </div>
   </div>
+  <div class="home-social-section" id="home-social-section" style="display:none">
+    <div class="home-social-label">FOLLOW &amp; LISTEN</div>
+    <div class="home-social-buttons" id="home-social-buttons"></div>
+  </div>
 </div>
 
 <!-- LYRICS LIST -->
@@ -420,7 +439,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbz6KwCKMPgIqArL2i8ZxgeQTAWXyoBG2FPYHWrQ6OSZt2q6zEtJBchGgLmb1aJiplmf/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw-3flCep7Ucwjb2S-zPz7N1XIlkOz6NFEIZ-Wb-MZ91blit957A6b1K5E9TCBKDqg/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -669,16 +688,30 @@
   };
 
   function renderSocialLinks() {
-    var container = document.getElementById('social-links');
-    if (!container) return;
     var social = (siteSettings && siteSettings.social) || {};
-    var html = Object.keys(SOCIAL_LABELS)
-      .filter(function (key) { return social[key]; })
-      .map(function (key) {
+    var activeKeys = Object.keys(SOCIAL_LABELS).filter(function (key) { return social[key]; });
+
+    var topbarContainer = document.getElementById('social-links');
+    if (topbarContainer) {
+      topbarContainer.innerHTML = activeKeys.map(function (key) {
         return '<a class="social-link" href="' + escapeHtml(social[key]) + '" target="_blank" rel="noopener">' +
           SOCIAL_LABELS[key] + '</a>';
       }).join('');
-    container.innerHTML = html;
+    }
+
+    var homeSection = document.getElementById('home-social-section');
+    var homeButtons = document.getElementById('home-social-buttons');
+    if (homeSection && homeButtons) {
+      if (activeKeys.length) {
+        homeButtons.innerHTML = activeKeys.map(function (key) {
+          return '<a class="social-btn" href="' + escapeHtml(social[key]) + '" target="_blank" rel="noopener">' +
+            SOCIAL_LABELS[key] + '</a>';
+        }).join('');
+        homeSection.style.display = '';
+      } else {
+        homeSection.style.display = 'none';
+      }
+    }
   }
 
   function loadSettings() {
