@@ -239,15 +239,20 @@
   .release-day-date{ font-family:'Press Start 2P', monospace; font-size:13px; color:var(--green); }
   .release-day-count{ font-family:'VT323', monospace; font-size:16px; color:var(--muted-dim); }
   .release-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px; }
-  .release-card{ background:var(--panel); border:2px solid var(--border); padding:10px; display:flex; gap:10px; align-items:flex-start; box-shadow:3px 3px 0 rgba(0,0,0,0.3); }
-  .release-cover{ width:52px; height:52px; object-fit:cover; border:1px solid var(--border); flex-shrink:0; background:#0a0d1c; }
+  .release-card{ background:var(--panel); border:2px solid var(--border); padding:10px 12px; display:flex; gap:10px; align-items:flex-start; box-shadow:3px 3px 0 rgba(0,0,0,0.3); }
   .release-info{ min-width:0; flex:1; }
   /* FIX: long titles/artists were being clipped with an ellipsis. Now the
      text wraps onto extra lines instead of being cut off, at full size. */
   .release-song{ font-family:'VT323', monospace; font-size:17px; color:var(--ink); white-space:normal; overflow-wrap:break-word; word-break:break-word; display:block; line-height:1.3; }
   .release-artist{ font-family:'VT323', monospace; font-size:15px; color:var(--muted); white-space:normal; overflow-wrap:break-word; word-break:break-word; line-height:1.3; }
+  /* FIX: a linked song used to look identical to plain text until you
+     hovered over it, so it wasn't obvious anything was clickable. Songs
+     with a link now always show in green with a permanent underline and
+     a small play icon, instead of that only appearing on hover. */
   .release-song-link{ cursor:pointer; text-decoration:none; }
-  .release-song-link:hover{ color:var(--green); text-decoration:underline; }
+  .release-song-link.has-link{ color:var(--green); text-decoration:underline; text-underline-offset:3px; }
+  .release-song-link.has-link:hover{ color:var(--amber); }
+  .release-link-ico{ display:inline-block; margin-right:6px; font-size:13px; }
 
   /* ---------- subtabs ---------- */
   .subtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:24px; }
@@ -430,10 +435,6 @@
       <p>The person running the archive.</p>
     </div>
   </div>
-  <div class="home-social-section" id="home-social-section" style="display:none">
-    <div class="home-social-label">FOLLOW &amp; LISTEN</div>
-    <div class="home-social-buttons" id="home-social-buttons"></div>
-  </div>
 </div>
 
 <!-- LYRICS = ARTIST PROFILE GRID -->
@@ -560,9 +561,10 @@
     <h3>REPORT AN ISSUE</h3>
     <p>What's wrong with this page? Select all that apply &mdash; details are optional.</p>
     <div class="bug-report-options" id="bug-report-options">
-      <label class="bug-report-option"><input type="checkbox" value="Wrong lyrics/grammar/spelling"> Wrong lyrics / grammar / spelling</label>
-      <label class="bug-report-option"><input type="checkbox" value="Wrong audio link"> Wrong audio link</label>
-      <label class="bug-report-option"><input type="checkbox" value="Wrong artist"> Wrong artist</label>
+      <label class="bug-report-option"><input type="checkbox" value="Incorrect lyrics/grammar/spelling"> Incorrect lyrics / grammar / spelling</label>
+      <label class="bug-report-option"><input type="checkbox" value="Incorrect audio link"> Incorrect audio link</label>
+      <label class="bug-report-option"><input type="checkbox" value="Incorrect artist(s)"> Incorrect artist(s)</label>
+      <label class="bug-report-option"><input type="checkbox" value="Incorrect artwork"> Incorrect artwork</label>
       <label class="bug-report-option"><input type="checkbox" value="Incorrectly color coded / no color coding"> Incorrectly color coded / no color coding</label>
       <label class="bug-report-option"><input type="checkbox" id="bug-report-other-check" value="Other"> Other</label>
     </div>
@@ -575,7 +577,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyMcrnwchuPK75SrZGP-zC2iSG6RPPJUdpGpK3rH-NruIX87rhnQZWaJmgnqBt6ZEH3/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzg1PJgdTtixUinzETkWWI0G5NL5Yf3USZSlhWx9F4AABLaxOQfn2ttArDH6CFk4-g/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1023,10 +1025,29 @@
   }
 
   // LYRICS = ARTIST PROFILES
+  // FIX: "," and "&" now split with OPTIONAL whitespace on either side
+  // (e.g. "A &B", "A& B", "A,B" all split correctly now, not just "A & B"
+  // / "A, B"). Previously a missing space around the separator meant the
+  // whole credit stayed glued together as one string, which never matched
+  // any entry on the Artists tab (including a hidden one) by name, so a
+  // hidden artist's split-off name could end up back on the grid as part
+  // of an unrecognized combined string instead of being filtered out.
   function splitArtistNames(raw) {
     if (!raw) return [];
-    var parts = String(raw).split(/,|\s+&\s+|\s+x\s+|\s+vs\.?\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+with\s+/i);
+    var parts = String(raw).split(/\s*,\s*|\s*&\s*|\s+x\s+|\s+vs\.?\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+with\s+/i);
     return parts.map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+  }
+
+  // Normalizes an artist name into a stable lookup key: trims, collapses
+  // any run of whitespace (including stray double-spaces or non-breaking
+  // spaces that sometimes creep in from copy/pasting) down to a single
+  // space, and lowercases. Used everywhere an artist name from the
+  // Lyrics sheet needs to be matched against an artist name on the
+  // Artists sheet (e.g. to find its PFP or its "Is Hidden" flag), so
+  // small formatting differences between the two sheets don't cause a
+  // false non-match.
+  function normalizeArtistKey(name) {
+    return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
   function loadLyrics() {
@@ -1061,7 +1082,8 @@
     var pfpMap = {};
     var hiddenMap = {};
     allArtists.forEach(function (a) {
-      var key = String(a.artist || '').trim().toLowerCase();
+      var key = normalizeArtistKey(a.artist);
+      if (!key) return;
       pfpMap[key] = a.pfp;
       if (a.hidden) hiddenMap[key] = true;
     });
@@ -1070,7 +1092,7 @@
     allLyrics.forEach(function (item) {
       if (isNA(item.artist)) return;
       splitArtistNames(item.artist).forEach(function (name) {
-        var key = name.toLowerCase();
+        var key = normalizeArtistKey(name);
         if (seen[key]) return;
         seen[key] = true;
         // Hidden artists (Is Hidden = TRUE on the Artists tab) don't get
@@ -1086,7 +1108,7 @@
     names.sort(function (a, b) {
       return artistSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     });
-    return names.map(function (n) { return { artist: n, pfp: pfpMap[n.toLowerCase()] || '' }; });
+    return names.map(function (n) { return { artist: n, pfp: pfpMap[normalizeArtistKey(n)] || '' }; });
   }
 
   function renderArtistGrid() {
@@ -1128,14 +1150,14 @@
   function renderArtistDetail(name) {
     var container = document.getElementById('artist-detail-content');
     var pfpEntry = allArtists.filter(function (a) {
-      return String(a.artist || '').trim().toLowerCase() === name.toLowerCase();
+      return normalizeArtistKey(a.artist) === normalizeArtistKey(name);
     })[0];
     var fallback = getFallbackImage();
     var pfp = (pfpEntry && pfpEntry.pfp) ? pfpEntry.pfp : fallback;
 
     var allSongs = allLyrics.filter(function (item) {
       return !isNA(item.artist) && splitArtistNames(item.artist).some(function (n) {
-        return n.toLowerCase() === name.toLowerCase();
+        return normalizeArtistKey(n) === normalizeArtistKey(name);
       });
     });
 
@@ -1300,27 +1322,26 @@
     container.innerHTML = groups.map(function (dateKey) {
       var items = byDate[dateKey];
       var cards = items.map(function (item) {
-        var img = item.cover ? escapeHtml(item.cover) : fallback;
         var titleText = escapeHtml(item.title);
         var songHtml;
+        var linkIcon = '<span class="release-link-ico">&#9654;</span>';
         if (item.youtube) {
           // Prefer YouTube — embeds inline in the floating player, same as Top 5.
-          songHtml = '<a class="release-song release-song-link" href="javascript:void(0)" onclick="openFloatingPlayer(\'' + escapeHtml(item.youtube) + '\')">' + titleText + '</a>';
+          songHtml = '<a class="release-song release-song-link has-link" href="javascript:void(0)" onclick="openFloatingPlayer(\'' + escapeHtml(item.youtube) + '\')">' + linkIcon + titleText + '</a>';
         } else if (item.youtubeRaw) {
           // FIX: if our embed-ID parser didn't recognize this particular
           // link format, don't just do nothing on click — open the raw
           // link in a new tab instead so it still works.
-          songHtml = '<a class="release-song release-song-link" href="' + escapeHtml(item.youtubeRaw) + '" target="_blank" rel="noopener">' + titleText + '</a>';
+          songHtml = '<a class="release-song release-song-link has-link" href="' + escapeHtml(item.youtubeRaw) + '" target="_blank" rel="noopener">' + linkIcon + titleText + '</a>';
         } else if (item.spotify) {
-          songHtml = '<a class="release-song release-song-link" href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">' + titleText + '</a>';
+          songHtml = '<a class="release-song release-song-link has-link" href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">' + linkIcon + titleText + '</a>';
         } else if (item.apple) {
-          songHtml = '<a class="release-song release-song-link" href="' + escapeHtml(item.apple) + '" target="_blank" rel="noopener">' + titleText + '</a>';
+          songHtml = '<a class="release-song release-song-link has-link" href="' + escapeHtml(item.apple) + '" target="_blank" rel="noopener">' + linkIcon + titleText + '</a>';
         } else {
           songHtml = '<div class="release-song">' + titleText + '</div>';
         }
         return (
           '<div class="release-card">' +
-            '<img class="release-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
             '<div class="release-info">' +
               songHtml +
               '<div class="release-artist">' + escapeHtml(item.artist) + '</div>' +
