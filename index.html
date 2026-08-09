@@ -435,32 +435,32 @@
     <div class="home-tile" data-route="lyrics">
       <div class="tag">BROWSE</div>
       <h3>LYRICS</h3>
-      <p>Full lyric pages for nerdcore tracks, pulled straight from the source doc.</p>
+      <p>Full lyric pages for every nerdocre song.</p>
     </div>
     <div class="home-tile" data-route="encyclopedia">
       <div class="tag">REFERENCE</div>
       <h3>ENCYCLOPEDIA</h3>
-      <p>Flip through the full Nerdcore Artist Encyclopedia, page by page.</p>
+      <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
     </div>
     <div class="home-tile" data-route="releases">
-      <div class="tag">CALENDAR-ISH</div>
+      <div class="tag">SONG DROPS</div>
       <h3>RELEASES</h3>
-      <p>What's dropping and what dropped recently, grouped cleanly by date.</p>
+      <p>What's dropping and what dropped recently.</p>
     </div>
     <div class="home-tile" data-route="top5">
-      <div class="tag">WEEKLY</div>
-      <h3>TOP 5 OF THE WEEK</h3>
-      <p>The five nerdcore songs worth your time this week, ranked.</p>
+      <div class="tag">RANKINGS</div>
+      <h3>TOP 5 SONGS OF THE WEEK</h3>
+      <p>The top nerdcore tracks of every week and more.</p>
     </div>
     <div class="home-tile" data-route="indiemonday">
-      <div class="tag">WEEKLY SPOTLIGHT</div>
+      <div class="tag">SIDE PROJECT</div>
       <h3>INDIE MONDAY</h3>
       <p>More details coming soon.</p>
     </div>
     <div class="home-tile" data-route="about">
       <div class="tag">WHO'S BEHIND THIS</div>
       <h3>ABOUT ME</h3>
-      <p>The person running the archive.</p>
+      <p>A small thing about the person who made this site.</p>
     </div>
   </div>
 </div>
@@ -498,7 +498,7 @@
   <div class="page-head">
     <div class="eyebrow">REFERENCE</div>
     <h1>THE ENCYCLOPEDIA</h1>
-    <p>Flip through it like the real thing.</p>
+    <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
   </div>
   <div class="flip-wrap" id="flip-wrap">
     <div class="loading">Loading encyclopedia&hellip;</div>
@@ -511,7 +511,7 @@
   <div class="page-head">
     <div class="eyebrow">CALENDAR-ISH</div>
     <h1>RELEASES</h1>
-    <p>Track upcoming releases and songs dropped over the past 31 days.</p>
+    <p>Tracks upcoming releases and songs dropped over the past month.</p>
   </div>
 
   <div class="subtabs">
@@ -529,14 +529,14 @@
   <div class="page-head">
     <div class="eyebrow">RANKINGS</div>
     <h1>TOP 5 NERDCORE SONGS</h1>
-    <p>Weekly picks, the year's best, playlists, and who shows up the most.</p>
+    <p>Weekly top songs, the year's best songs, and more.</p>
   </div>
 
   <div class="subtabs">
-    <div class="subtab active" data-pane="weekly">WEEKLY TOP 5</div>
-    <div class="subtab" data-pane="yearly">TOP 10 OF THE YEAR</div>
-    <div class="subtab" data-pane="playlists">PLAYLISTS</div>
-    <div class="subtab" data-pane="stats">MOST FEATURED</div>
+    <div class="subtab active" data-pane="weekly">TOP 5 SONGS OF THE WEEK</div>
+    <div class="subtab" data-pane="yearly">TOP 10 SONGS OF THE YEAR</div>
+    <div class="subtab" data-pane="playlists">WEEKLY TOP 5 PLAYLISTS</div>
+    <div class="subtab" data-pane="stats">MOST FEATURED ARTISTS ON TOP 5 WEEKLY SONGS</div>
   </div>
 
   <div class="subpane active" id="pane-weekly">
@@ -587,7 +587,7 @@
 <div class="modal-overlay" id="bug-report-overlay">
   <div class="modal-box">
     <h3>REPORT AN ISSUE</h3>
-    <p>What's wrong with this page? Select all that apply &mdash; details are optional.</p>
+    <p>What's wrong with this page? Select all that apply.</p>
     <div class="bug-report-options" id="bug-report-options">
       <label class="bug-report-option"><input type="checkbox" value="Incorrect lyrics/grammar/spelling"> Incorrect lyrics / grammar / spelling</label>
       <label class="bug-report-option"><input type="checkbox" value="Incorrect audio link"> Incorrect audio link</label>
@@ -605,7 +605,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwaQtH-qtpKKumHUAZOwbw24nlMrJhWyL4Nc-o_aq6cDmBITP_8brFxDeho9EF0NUMa/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbx1BkQoHhpGB4DU87wZiS7BT-wPeY-cn2_6bzASjQXIDcpxpwEUHcTOH_y-zy1jaQSi/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -973,7 +973,7 @@
 
   // SOCIAL LINKS
   var SOCIAL_LABELS = {
-    twitter: 'Twitter / X',
+    twitter: 'Twitter',
     instagram: 'Instagram',
     discord: 'Discord',
     tiktok: 'TikTok',
