@@ -388,7 +388,6 @@
       <div class="nav-tab" data-route="releases">Releases</div>
       <div class="nav-tab" data-route="top5">Top 5</div>
     </div>
-    <div class="social-links" id="social-links"></div>
   </div>
 </div>
 
@@ -576,7 +575,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwwoqX_ZVzMGJ6SvLxtpEyd18peJEZzu9PGtB998jCV4TspjVDHBmBhhHnsVJh5-WLg/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwTP3jvDV9bxeuZyQHdzlO7QpgaU_UYNnBXPeQPYw7FvcPbsAWNeeE7uSbVn7jOgAuB/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -955,14 +954,6 @@
   function renderSocialLinks() {
     var social = (siteSettings && siteSettings.social) || {};
     var activeKeys = Object.keys(SOCIAL_LABELS).filter(function (key) { return social[key]; });
-
-    var topbarContainer = document.getElementById('social-links');
-    if (topbarContainer) {
-      topbarContainer.innerHTML = activeKeys.map(function (key) {
-        return '<a class="social-link" href="' + escapeHtml(social[key]) + '" target="_blank" rel="noopener">' +
-          SOCIAL_LABELS[key] + '</a>';
-      }).join('');
-    }
 
     var homeSection = document.getElementById('home-social-section');
     var homeButtons = document.getElementById('home-social-buttons');
