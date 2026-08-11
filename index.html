@@ -1784,7 +1784,7 @@
     api('encyclopedia').then(function (pages) {
       encPages = pages || [];
       if (!encPages.length) {
-        wrap.innerHTML = '<div class="flip-fallback">No encyclopedia pages yet. On the spreadsheet, add an "Encyclopedia" tab with an "Image URL" column and paste one page image link per row, in reading order.</div>';
+        wrap.innerHTML = '<div class="flip-fallback">Check back later!</div>';
         return;
       }
       renderEncyclopediaShell(wrap);
