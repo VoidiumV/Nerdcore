@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --bg-a:#1a2050; --bg-b:#0b0e1a;
@@ -383,10 +382,40 @@
   .flip-btn{ font-family:'Press Start 2P', monospace; font-size:10px; background:var(--panel); color:var(--green); border:2px solid var(--green); padding:9px 14px; cursor:pointer; box-shadow:3px 3px 0 #000; }
   .flip-btn:disabled{ opacity:0.4; cursor:not-allowed; }
   .flip-page-label{ font-family:'VT323', monospace; font-size:18px; color:var(--muted); }
-  .flip-canvas-wrap{ background:#0b0e1a; border:3px solid var(--border); box-shadow:0 0 0 4px #0b0e1a, 0 0 30px rgba(61,255,143,0.08); padding:10px; max-width:100%; overflow:auto; }
-  #flipCanvas{ display:block; max-width:100%; height:auto; }
   .flip-fallback{ text-align:center; font-family:'VT323', monospace; font-size:18px; color:var(--muted); padding:40px 20px; max-width:500px; }
   .flip-fallback a{ color:var(--green); text-decoration:underline; }
+
+  /* ---------- encyclopedia "digital book" page viewer ---------- */
+  .enc-book{
+    position:relative;
+    width:100%; max-width:760px;
+    background:var(--panel); border:3px solid var(--border);
+    box-shadow:0 0 0 4px #0b0e1a, 0 0 34px rgba(61,255,143,0.10), 6px 6px 0 rgba(0,0,0,0.4);
+    padding:16px;
+  }
+  .enc-page-inner{
+    position:relative;
+    background:#0a0d1c; border:1px solid var(--border);
+    min-height:240px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    cursor:pointer;
+  }
+  .enc-page-inner img{
+    width:100%; height:auto; display:block;
+    opacity:1; transform:scale(1) rotateY(0deg);
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .enc-page-inner.enc-turning-next img{ opacity:0; transform:scale(0.97) rotateY(-6deg); }
+  .enc-page-inner.enc-turning-prev img{ opacity:0; transform:scale(0.97) rotateY(6deg); }
+  .enc-page-zone{ position:absolute; top:0; bottom:0; width:34%; z-index:2; }
+  .enc-page-zone.left{ left:0; }
+  .enc-page-zone.right{ right:0; }
+  .enc-jump-row{ display:flex; align-items:center; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .enc-jump-row input{
+    font-family:'Space Mono', monospace; font-size:14px; width:64px; text-align:center;
+    background:var(--panel); border:2px solid var(--border); color:var(--ink); padding:8px 6px; outline:none;
+  }
+  .enc-jump-row input:focus{ border-color:var(--green); }
 
   /* ---------- DRAGGABLE + RESIZABLE FLOATING PLAYER WIDGET ---------- */
   #floating-player{
@@ -544,7 +573,7 @@
     <h1>THE ENCYCLOPEDIA</h1>
     <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
   </div>
-  <div class="flip-wrap" id="flip-wrap">
+  <div class="flip-wrap" id="enc-wrap">
     <div class="loading">Loading encyclopedia&hellip;</div>
   </div>
 </div>
@@ -651,7 +680,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwsBmuFtjsjQBdVBdfLlyA6LL-ygWXP6mAr6WgZSYWSjoU4RiRU1BZBKDHxChfMydLS/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwMaaJi0RYnzweJ3-t6nzxqzDiCPBg1wfq2hh3rrhM5vafafqlrjXIMekyW-P0n1IA/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1741,77 +1770,117 @@
     });
   }
 
-  // ENCYCLOPEDIA
-  var pdfDoc = null, pdfPageNum = 1, pdfScale = 1.3, pdfRendering = false;
+  // ENCYCLOPEDIA — a page-by-page image "book", sourced from the
+  // Encyclopedia sheet tab (one exported page image per row) instead of
+  // a PDF. Pages are preloaded a page ahead/behind so flipping feels
+  // instant, and a short cross-fade + tilt stands in for a page turn.
+  var encPages = [];
+  var encPageNum = 1;
+  var encPreloaded = {};
 
   function loadEncyclopedia() {
     encyclopediaLoaded = true;
-    var wrap = document.getElementById('flip-wrap');
-    var pdfUrl = siteSettings && siteSettings.encyclopediaPdfUrl;
-
-    function afterSettings() {
-      pdfUrl = siteSettings && siteSettings.encyclopediaPdfUrl;
-      if (!pdfUrl) {
-        wrap.innerHTML = '<div class="flip-fallback">No encyclopedia PDF has been linked yet. Add an "Encyclopedia PDF URL" row to the Settings sheet.</div>';
+    var wrap = document.getElementById('enc-wrap');
+    api('encyclopedia').then(function (pages) {
+      encPages = pages || [];
+      if (!encPages.length) {
+        wrap.innerHTML = '<div class="flip-fallback">No encyclopedia pages yet. On the spreadsheet, add an "Encyclopedia" tab with an "Image URL" column and paste one page image link per row, in reading order.</div>';
         return;
       }
-      renderFlipbook(wrap, pdfUrl);
-    }
-
-    if (pdfUrl) { renderFlipbook(wrap, pdfUrl); }
-    else { api('settings').then(function (s) { siteSettings = s || siteSettings; afterSettings(); }).catch(afterSettings); }
+      renderEncyclopediaShell(wrap);
+      showEncPage(1, null);
+    }).catch(function (err) {
+      encyclopediaLoaded = false;
+      renderErrorWithRetry(wrap, "Couldn't load the encyclopedia: " + escapeHtml(err.message || err), loadEncyclopedia);
+    });
   }
 
-  function renderFlipbook(wrap, pdfUrl) {
-    if (typeof pdfjsLib === 'undefined') {
-      wrap.innerHTML = '<div class="flip-fallback">Couldn\'t load the PDF viewer. <a href="' + escapeHtml(pdfUrl) + '" target="_blank" rel="noopener">Open the encyclopedia PDF directly</a> instead.</div>';
-      return;
-    }
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
+  function renderEncyclopediaShell(wrap) {
     wrap.innerHTML =
       '<div class="flip-toolbar">' +
-        '<button class="flip-btn" id="pdf-prev">&larr; PREV</button>' +
-        '<span class="flip-page-label" id="pdf-page-label">Loading&hellip;</span>' +
-        '<button class="flip-btn" id="pdf-next">NEXT &rarr;</button>' +
+        '<button class="flip-btn" id="enc-prev">&larr; PREV</button>' +
+        '<span class="flip-page-label" id="enc-page-label"></span>' +
+        '<button class="flip-btn" id="enc-next">NEXT &rarr;</button>' +
       '</div>' +
-      '<div class="flip-canvas-wrap"><canvas id="flipCanvas"></canvas></div>';
+      '<div class="enc-book">' +
+        '<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>' +
+        '<div class="enc-page-inner" id="enc-page-inner">' +
+          '<div class="enc-page-zone left" id="enc-zone-prev" title="Previous page"></div>' +
+          '<img id="enc-page-img" alt="Encyclopedia page">' +
+          '<div class="enc-page-zone right" id="enc-zone-next" title="Next page"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="enc-jump-row">' +
+        '<span class="date-str">Jump to page:</span>' +
+        '<input type="number" id="enc-jump-input" min="1" max="' + encPages.length + '">' +
+        '<div class="flip-btn" id="enc-jump-go">GO</div>' +
+      '</div>';
 
-    pdfjsLib.getDocument(pdfUrl).promise.then(function (doc) {
-      pdfDoc = doc;
-      pdfPageNum = 1;
-      renderPdfPage(pdfPageNum);
-    }).catch(function () {
-      wrap.innerHTML = '<div class="flip-fallback">Couldn\'t load the PDF from that link. <a href="' + escapeHtml(pdfUrl) + '" target="_blank" rel="noopener">Try opening it directly</a> instead.</div>';
-    });
-
-    document.getElementById('pdf-prev').addEventListener('click', function () {
-      if (pdfPageNum <= 1) return;
-      pdfPageNum--; renderPdfPage(pdfPageNum);
-    });
-    document.getElementById('pdf-next').addEventListener('click', function () {
-      if (!pdfDoc || pdfPageNum >= pdfDoc.numPages) return;
-      pdfPageNum++; renderPdfPage(pdfPageNum);
+    document.getElementById('enc-prev').addEventListener('click', function () { showEncPage(encPageNum - 1, 'prev'); });
+    document.getElementById('enc-next').addEventListener('click', function () { showEncPage(encPageNum + 1, 'next'); });
+    document.getElementById('enc-zone-prev').addEventListener('click', function () { showEncPage(encPageNum - 1, 'prev'); });
+    document.getElementById('enc-zone-next').addEventListener('click', function () { showEncPage(encPageNum + 1, 'next'); });
+    document.getElementById('enc-jump-go').addEventListener('click', encJumpToInput);
+    document.getElementById('enc-jump-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') encJumpToInput();
     });
   }
 
-  function renderPdfPage(num) {
-    if (!pdfDoc || pdfRendering) return;
-    pdfRendering = true;
-    pdfDoc.getPage(num).then(function (page) {
-      var canvas = document.getElementById('flipCanvas');
-      var ctx = canvas.getContext('2d');
-      var viewport = page.getViewport({ scale: pdfScale });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function () {
-        pdfRendering = false;
-        document.getElementById('pdf-page-label').textContent = 'Page ' + num + ' of ' + pdfDoc.numPages;
-        document.getElementById('pdf-prev').disabled = (num <= 1);
-        document.getElementById('pdf-next').disabled = (num >= pdfDoc.numPages);
-      });
-    });
+  function encJumpToInput() {
+    var input = document.getElementById('enc-jump-input');
+    var n = parseInt(input.value, 10);
+    if (!n) return;
+    showEncPage(n, null);
   }
+
+  function preloadEncPage_(n) {
+    if (n < 1 || n > encPages.length || encPreloaded[n]) return;
+    encPreloaded[n] = true;
+    var im = new Image();
+    im.src = encPages[n - 1].url;
+  }
+
+  function showEncPage(n, direction) {
+    if (!encPages.length) return;
+    n = Math.max(1, Math.min(encPages.length, n));
+    encPageNum = n;
+    var page = encPages[n - 1];
+
+    var inner = document.getElementById('enc-page-inner');
+    var img = document.getElementById('enc-page-img');
+    var fallback = getFallbackImage();
+
+    if (direction) inner.classList.add('enc-turning-' + direction);
+    var pre = new Image();
+    pre.onload = function () {
+      img.src = page.url;
+      inner.classList.remove('enc-turning-next', 'enc-turning-prev');
+    };
+    pre.onerror = function () {
+      img.src = fallback;
+      inner.classList.remove('enc-turning-next', 'enc-turning-prev');
+    };
+    pre.src = page.url;
+
+    document.getElementById('enc-page-label').textContent =
+      'Page ' + n + ' of ' + encPages.length + (page.label ? ' \u2014 ' + page.label : '');
+    document.getElementById('enc-prev').disabled = (n <= 1);
+    document.getElementById('enc-next').disabled = (n >= encPages.length);
+    var jumpInput = document.getElementById('enc-jump-input');
+    if (jumpInput) jumpInput.value = '';
+
+    preloadEncPage_(n + 1);
+    preloadEncPage_(n - 1);
+  }
+
+  function encKeyHandler(e) {
+    if (document.getElementById('view-encyclopedia').style.display === 'none') return;
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'ArrowLeft') showEncPage(encPageNum - 1, 'prev');
+    else if (e.key === 'ArrowRight') showEncPage(encPageNum + 1, 'next');
+  }
+  document.addEventListener('keydown', encKeyHandler);
 
   loadSettings();
   routeFromHash();
