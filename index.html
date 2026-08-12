@@ -591,7 +591,7 @@
   <div class="page-head">
     <div class="eyebrow">BROWSE</div>
     <h1>LYRICS</h1>
-    <p>Full lyric pages for every nerdcore song..</p>
+    <p>Pick an artist — or browse by franchise/show/character.</p>
   </div>
   <div data-disclaimer-page="lyrics"></div>
 
@@ -760,7 +760,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyCvWeQxvNvGXZRKOtQ9N9hq6QZB_5hYmzN4hiKxoqO9x_KwT33wK3AG3J0dA_HEvEf/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzbZHgpqOYZAyebqVMQhsh4q79S5mc0M0lndWRguqk9QkwxKeM6d9AKtmr4QklEvt3P/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1585,15 +1585,48 @@
     });
   }
 
+  // FIX: the same character name (e.g. "Jinx") can legitimately appear
+  // MORE THAN ONCE on the Characters tab — once per franchise, each with
+  // its own Image URL (Jinx-in-Arcane vs Jinx-in-League-of-Legends).
+  // Keying purely by character name meant whichever row loaded last
+  // silently won for every franchise. This now keys primarily by
+  // "franchise|character" so each franchise's row for that character
+  // resolves to ITS OWN image/hidden flag, and only falls back to a
+  // name-only match for a Characters row that was left with no
+  // Franchise value at all (a genuinely franchise-agnostic entry).
   function uniqueCharactersForFranchise_(name) {
-    var metaMap = {};
-    var hiddenMap = {};
+    var fKey = normalizeArtistKey(name);
+    var metaByCombo = {};
+    var metaByNameOnly = {};
+    var hiddenCombo = {};
+    var hiddenNameOnly = {};
     allCharacters.forEach(function (c) {
       var ck = normalizeArtistKey(c.character);
       if (!ck) return;
-      metaMap[ck] = c;
-      if (c.hidden) hiddenMap[ck] = true;
+      var cf = normalizeArtistKey(c.franchise);
+      if (cf) {
+        var comboKey = cf + '|' + ck;
+        metaByCombo[comboKey] = c;
+        if (c.hidden) hiddenCombo[comboKey] = true;
+      } else {
+        metaByNameOnly[ck] = c;
+        if (c.hidden) hiddenNameOnly[ck] = true;
+      }
     });
+
+    function lookupMeta(ck) {
+      return metaByCombo[fKey + '|' + ck] || metaByNameOnly[ck] || null;
+    }
+    function isHiddenFor(ck) {
+      if (hiddenCombo[fKey + '|' + ck]) return true;
+      // Only fall back to a name-only "Is Hidden" if there's no
+      // franchise-specific row for this character+franchise at all —
+      // otherwise a hidden Jinx-in-League-of-Legends row would wrongly
+      // hide the (separately un-hidden) Jinx-in-Arcane row too.
+      if (!metaByCombo[fKey + '|' + ck] && hiddenNameOnly[ck]) return true;
+      return false;
+    }
+
     var seen = {};
     var names = [];
     franchiseSongs_(name).forEach(function (item) {
@@ -1602,7 +1635,7 @@
         var ck = normalizeArtistKey(c);
         if (seen[ck]) return;
         seen[ck] = true;
-        if (hiddenMap[ck]) return;
+        if (isHiddenFor(ck)) return;
         names.push(c);
       });
     });
@@ -1612,7 +1645,7 @@
       return franchiseCharSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     });
     return names.map(function (n) {
-      var meta = metaMap[normalizeArtistKey(n)] || {};
+      var meta = lookupMeta(normalizeArtistKey(n)) || {};
       return { character: n, image: meta.image || '' };
     });
   }
