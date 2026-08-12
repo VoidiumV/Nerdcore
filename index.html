@@ -760,7 +760,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzbZHgpqOYZAyebqVMQhsh4q79S5mc0M0lndWRguqk9QkwxKeM6d9AKtmr4QklEvt3P/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxxrs8pO8kT0I5OSZ2qMr9BEd9JWo5kro3JUWOoULixIP729mKbUCHAGVHSHWHFUsI/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1578,6 +1578,37 @@
     renderFranchiseGrid();
   });
 
+  // Validates/normalizes a hex color string (e.g. "ffb627" or
+  // "#FFB627") into a proper "#RRGGBB"/"#RGB" form, or '' if it isn't a
+  // usable hex color (e.g. left blank on the Characters sheet).
+  function normalizeHexColor_(hex) {
+    var h = String(hex || '').trim();
+    if (!h) return '';
+    if (h.charAt(0) !== '#') h = '#' + h;
+    return /^#[0-9a-fA-F]{3}$|^#[0-9a-fA-F]{6}$/.test(h) ? h : '';
+  }
+
+  // Finds the best-matching Characters-tab row for a given
+  // franchise+character pair: an exact franchise+character match first,
+  // falling back to a character row that was left with no Franchise
+  // value at all (a franchise-agnostic entry). Same "same name, two
+  // different franchises get two different images/colors" logic used by
+  // uniqueCharactersForFranchise_ below, just as a standalone lookup for
+  // a single character (used on the character's song list page and on
+  // the song detail page's character tag badges).
+  function findCharacterMeta_(franchise, character) {
+    var fKey = normalizeArtistKey(franchise);
+    var ck = normalizeArtistKey(character);
+    var comboMatch = null, nameOnlyMatch = null;
+    allCharacters.forEach(function (c) {
+      if (normalizeArtistKey(c.character) !== ck) return;
+      var cf = normalizeArtistKey(c.franchise);
+      if (cf && cf === fKey) comboMatch = c;
+      else if (!cf) nameOnlyMatch = c;
+    });
+    return comboMatch || nameOnlyMatch || null;
+  }
+
   function franchiseSongs_(name) {
     var key = normalizeArtistKey(name);
     return allLyrics.filter(function (item) {
@@ -1776,13 +1807,22 @@
           splitCsv_(item.franchise).some(function (f) { return normalizeArtistKey(f) === fKey; }) &&
           splitCsv_(item.character).some(function (c) { return normalizeArtistKey(c) === cKey; });
       });
-      renderFranchiseSongsPage_(character, franchise, songs);
+      // NEW: show the character's own image (franchise-specific, via
+      // findCharacterMeta_) as the hero image on their song list page.
+      var meta = findCharacterMeta_(franchise, character) || {};
+      renderFranchiseSongsPage_(character, franchise, songs, meta.image || '');
     }
 
-    if (!lyricsLoaded) {
+    var needLyrics = !lyricsLoaded;
+    var needChars = !charactersLoaded;
+    if (needLyrics || needChars) {
       document.getElementById('franchise-songs-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
-      api('lyrics').then(function (list) {
-        allLyrics = list || []; lyricsLoaded = true; render();
+      var lyricsPromise = needLyrics ? api('lyrics') : Promise.resolve(allLyrics);
+      var charsPromise = needChars ? api('characters').catch(function () { return []; }) : Promise.resolve(allCharacters);
+      Promise.all([lyricsPromise, charsPromise]).then(function (r) {
+        if (needLyrics) { allLyrics = r[0] || []; lyricsLoaded = true; }
+        if (needChars) { allCharacters = r[1] || []; charactersLoaded = true; }
+        render();
       }).catch(function (err) {
         renderErrorWithRetry(document.getElementById('franchise-songs-content'),
           "Couldn't load songs: " + escapeHtml(err.message || err), function () { showFranchiseCharacterDetail(franchise, character); });
@@ -1804,13 +1844,20 @@
     franchiseSongsSearchQuery = '';
 
     function render() {
-      renderFranchiseSongsPage_(franchise, 'All songs', franchiseSongs_(franchise));
+      var meta = allFranchises.filter(function (f) { return normalizeArtistKey(f.franchise) === normalizeArtistKey(franchise); })[0] || {};
+      renderFranchiseSongsPage_(franchise, 'All songs', franchiseSongs_(franchise), meta.image || '');
     }
 
-    if (!lyricsLoaded) {
+    var needLyrics = !lyricsLoaded;
+    var needFranchises = !franchisesLoaded;
+    if (needLyrics || needFranchises) {
       document.getElementById('franchise-songs-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
-      api('lyrics').then(function (list) {
-        allLyrics = list || []; lyricsLoaded = true; render();
+      var lyricsPromise = needLyrics ? api('lyrics') : Promise.resolve(allLyrics);
+      var franPromise = needFranchises ? api('franchises').catch(function () { return []; }) : Promise.resolve(allFranchises);
+      Promise.all([lyricsPromise, franPromise]).then(function (r) {
+        if (needLyrics) { allLyrics = r[0] || []; lyricsLoaded = true; }
+        if (needFranchises) { allFranchises = r[1] || []; franchisesLoaded = true; }
+        render();
       }).catch(function (err) {
         renderErrorWithRetry(document.getElementById('franchise-songs-content'),
           "Couldn't load songs: " + escapeHtml(err.message || err), function () { showFranchiseAllSongs(franchise); });
@@ -1822,8 +1869,10 @@
 
   // Shared renderer for both "a character's songs" and "all songs in a
   // franchise" — same look as an artist's song list, with its own
-  // search box + A-Z/Z-A sort.
-  function renderFranchiseSongsPage_(title, subtitle, songsForPage) {
+  // search box + A-Z/Z-A sort. heroImage (optional) shows the
+  // character's/franchise's picture in the hero banner, same spot the
+  // artist detail page uses.
+  function renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage) {
     var container = document.getElementById('franchise-songs-content');
     var fallback = getFallbackImage();
 
@@ -1832,9 +1881,14 @@
       return franchiseSongsSortDir === 'asc' ? cmp : -cmp;
     });
 
+    var imgHtml = heroImage
+      ? '<img class="detail-hero-img" src="' + escapeHtml(optimizeArtUrl(heroImage, 440)) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">'
+      : '';
+
     var header =
       '<div class="detail-hero">' +
-        '<div class="detail-hero-text" style="padding:26px;">' +
+        imgHtml +
+        '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(title) + '</h1>' +
           '<div class="detail-meta"><span>' + escapeHtml(subtitle) + '</span><span>' + sorted.length + (sorted.length === 1 ? ' song' : ' songs') + '</span></div>' +
         '</div>' +
@@ -1877,7 +1931,7 @@
     if (sortToggle) {
       sortToggle.addEventListener('click', function () {
         franchiseSongsSortDir = franchiseSongsSortDir === 'asc' ? 'desc' : 'asc';
-        renderFranchiseSongsPage_(title, subtitle, songsForPage);
+        renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
       });
     }
 
@@ -1886,7 +1940,7 @@
       searchInput.addEventListener('input', function () {
         franchiseSongsSearchQuery = this.value;
         var caret = this.selectionStart;
-        renderFranchiseSongsPage_(title, subtitle, songsForPage);
+        renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
         var freshInput = document.getElementById('franchise-songs-search');
         if (freshInput) { freshInput.focus(); try { freshInput.setSelectionRange(caret, caret); } catch (e) { } }
       });
@@ -2014,7 +2068,17 @@
   });
 
   function loadLyricDetail(id) {
-    api('lyric', { id: id }).then(renderLyricDetail).catch(function (err) {
+    var lyricPromise = api('lyric', { id: id });
+    // Also fetch franchise + character metadata (for custom tag colors
+    // on this page) if not already cached — done in parallel so it
+    // doesn't add an extra sequential round trip.
+    var franPromise = franchisesLoaded ? Promise.resolve(allFranchises) : api('franchises').catch(function () { return []; });
+    var charsPromise = charactersLoaded ? Promise.resolve(allCharacters) : api('characters').catch(function () { return []; });
+    Promise.all([lyricPromise, franPromise, charsPromise]).then(function (r) {
+      if (!franchisesLoaded) { allFranchises = r[1] || []; franchisesLoaded = true; }
+      if (!charactersLoaded) { allCharacters = r[2] || []; charactersLoaded = true; }
+      renderLyricDetail(r[0]);
+    }).catch(function (err) {
       renderErrorWithRetry(document.getElementById('lyrics-detail-content'),
         "Couldn't load this page: " + escapeHtml(err.message || err), function () { loadLyricDetail(id); });
     });
@@ -2074,12 +2138,33 @@
       var tagBits = [];
       if (!isNA(post.franchise)) {
         splitCsv_(post.franchise).forEach(function (f) {
-          tagBits.push('<span class="badge ep" style="cursor:pointer;" data-tag-franchise="' + escapeHtml(f) + '">' + escapeHtml(f) + '</span>');
+          // NEW: if this franchise has a custom "Color" set on the
+          // Franchises tab, use it for the badge instead of the default
+          // blue "ep" badge styling. Leave the Color cell blank to keep
+          // the default look.
+          var fMeta = allFranchises.filter(function (x) { return normalizeArtistKey(x.franchise) === normalizeArtistKey(f); })[0] || {};
+          var fColor = normalizeHexColor_(fMeta.color);
+          var fClassAttr = fColor ? 'badge' : 'badge ep';
+          var fStyleAttr = fColor
+            ? ' style="cursor:pointer; color:' + fColor + '; border-color:' + fColor + ';"'
+            : ' style="cursor:pointer;"';
+          tagBits.push('<span class="' + fClassAttr + '"' + fStyleAttr + ' data-tag-franchise="' + escapeHtml(f) + '">' + escapeHtml(f) + '</span>');
         });
       }
       if (!isNA(post.character)) {
         splitCsv_(post.character).forEach(function (c) {
-          tagBits.push('<span class="badge album" style="cursor:pointer;" data-tag-character="' + escapeHtml(c) + '" data-tag-character-franchise="' + escapeHtml(firstFranchise) + '">' + escapeHtml(c) + '</span>');
+          // NEW: if this character has a custom "Color" set on the
+          // Characters tab (for this franchise, or a franchise-agnostic
+          // row), use it for the badge instead of the default magenta
+          // "album" badge styling. Leave the Color cell blank to keep
+          // the default look.
+          var meta = findCharacterMeta_(firstFranchise, c) || {};
+          var customColor = normalizeHexColor_(meta.color);
+          var classAttr = customColor ? 'badge' : 'badge album';
+          var styleAttr = customColor
+            ? ' style="cursor:pointer; color:' + customColor + '; border-color:' + customColor + ';"'
+            : ' style="cursor:pointer;"';
+          tagBits.push('<span class="' + classAttr + '"' + styleAttr + ' data-tag-character="' + escapeHtml(c) + '" data-tag-character-franchise="' + escapeHtml(firstFranchise) + '">' + escapeHtml(c) + '</span>');
         });
       }
       tagsHtml = '<div class="lyric-meta-row" style="margin-top:10px;">' + tagBits.join(' ') + '</div>';
