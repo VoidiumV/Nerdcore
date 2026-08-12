@@ -269,7 +269,7 @@
   .about-social-section{ text-align:center; margin-top:8px; }
   .about-social-section .home-social-buttons{ justify-content:center; }
 
-  /* ---------- artist profile grid ---------- */
+  /* ---------- artist / franchise / character profile grid ---------- */
   .artist-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
   @media(max-width:900px){ .artist-grid{ grid-template-columns:repeat(3,1fr); } }
   @media(max-width:620px){ .artist-grid{ grid-template-columns:repeat(2,1fr); } }
@@ -282,9 +282,14 @@
   .artist-card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 rgba(0,0,0,0.4); border-color:var(--green); }
   .artist-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; background:#0a0d1c; border-bottom:3px solid var(--border); display:block; }
   .artist-card .name{ font-family:'Press Start 2P', monospace; font-size:12px; color:var(--green); padding:12px 10px; text-align:center; line-height:1.6; }
+  /* NEW: small category tag under a franchise tile's name (e.g. "VIDEO
+     GAME" / "ANIME" / "SUPERHERO"), sourced from the optional Franchises
+     tab's "Category" column. */
+  .franchise-cat{ font-family:'VT323', monospace; font-size:13px; color:var(--amber); text-align:center; padding:0 10px 12px; letter-spacing:0.5px; }
   .sort-arrow{ font-family:'VT323', monospace; font-size:20px; line-height:1; vertical-align:middle; padding:0 2px; position:relative; top:-3px; }
 
-  /* ---------- artist detail toolbar (search + sort) ---------- */
+  /* ---------- artist detail toolbar (search + sort) — reused by
+       franchise/character song lists too ---------- */
   .artist-detail-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
   .artist-detail-search{ flex:1; min-width:180px; }
 
@@ -534,6 +539,7 @@
       <div class="nav-tab" data-route="encyclopedia">Encyclopedia</div>
       <div class="nav-tab" data-route="releases">Releases</div>
       <div class="nav-tab" data-route="top5">Awards</div>
+      <div class="nav-tab" data-route="indiemonday">Indie Monday</div>
     </div>
   </div>
 </div>
@@ -566,6 +572,11 @@
       <h3>ENCYCLOPEDIA</h3>
       <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
     </div>
+    <div class="home-tile" data-route="indiemonday">
+      <div class="tag">WEEKLY SPOTLIGHT</div>
+      <h3>INDIE MONDAY</h3>
+      <p>Nerdcore artists featured on the Indie Monday blog.</p>
+    </div>
     <div class="home-tile" data-route="about">
       <div class="tag">WHO'S BEHIND THIS</div>
       <h3>ABOUT ME</h3>
@@ -574,26 +585,54 @@
   </div>
 </div>
 
-<!-- LYRICS = ARTIST PROFILE GRID -->
+<!-- LYRICS = ARTIST PROFILE GRID / FRANCHISE BROWSE -->
 <div class="page" id="view-lyrics-list" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
     <div class="eyebrow">BROWSE</div>
     <h1>LYRICS</h1>
-    <p>Pick an artist to see their tracks.</p>
-    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+    <p>Pick an artist — or browse by franchise/show/character.</p>
   </div>
   <div data-disclaimer-page="lyrics"></div>
-  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
-    <div class="nav-tab" id="artist-sort-toggle">SORT: A<span class="sort-arrow">&#8594;</span>Z</div>
+
+  <div class="subtabs" id="lyrics-browse-tabs">
+    <div class="subtab active" data-browsemode="artist">BY ARTIST</div>
+    <div class="subtab" data-browsemode="franchise">BY FRANCHISE</div>
   </div>
-  <div id="artist-grid-content"><div class="loading">Loading artists&hellip;</div></div>
+
+  <div class="subpane active" id="browsepane-artist">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;" style="width:100%; margin-bottom:18px;">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
+      <div class="nav-tab" id="artist-sort-toggle">SORT: A<span class="sort-arrow">&#8594;</span>Z</div>
+    </div>
+    <div id="artist-grid-content"><div class="loading">Loading artists&hellip;</div></div>
+  </div>
+
+  <div class="subpane" id="browsepane-franchise">
+    <input type="text" class="search-box" id="franchise-search" placeholder="Search franchises&hellip;" style="width:100%; margin-bottom:18px;">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
+      <div class="nav-tab" id="franchise-sort-toggle">SORT: A<span class="sort-arrow">&#8594;</span>Z</div>
+    </div>
+    <div id="franchise-grid-content"><div class="loading">Loading franchises&hellip;</div></div>
+  </div>
 </div>
 
 <!-- ARTIST DETAIL (that artist's songs) -->
 <div class="page" id="view-artist-detail" style="display:none">
   <span class="back-link" data-route="lyrics">&larr; All Artists</span>
   <div id="artist-detail-content"><div class="loading">Loading&hellip;</div></div>
+</div>
+
+<!-- FRANCHISE DETAIL (characters within a franchise) -->
+<div class="page" id="view-franchise-detail" style="display:none">
+  <span class="back-link" data-route="lyrics">&larr; All Franchises</span>
+  <div id="franchise-detail-content"><div class="loading">Loading&hellip;</div></div>
+</div>
+
+<!-- FRANCHISE SONGS (a character's songs, or "all songs" for a franchise) -->
+<div class="page" id="view-franchise-songs" style="display:none">
+  <span class="back-link" id="franchise-songs-back">&larr; Back</span>
+  <div id="franchise-songs-content"><div class="loading">Loading&hellip;</div></div>
 </div>
 
 <!-- LYRICS DETAIL -->
@@ -721,7 +760,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycby4lKtKGG8zuqW__pqTyzo9olcv8zxZlcrqUZvraKEargnzqXqdttfhoDJWHC9jC_HB/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyCvWeQxvNvGXZRKOtQ9N9hq6QZB_5hYmzN4hiKxoqO9x_KwT33wK3AG3J0dA_HEvEf/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -786,6 +825,15 @@
     return (siteSettings && siteSettings.defaultImage) || 'https://placehold.co/220x220/141831/3dff8f?text=%3F';
   }
 
+  // Splits a comma-separated tag cell (Franchise / Character columns)
+  // into trimmed, non-empty parts. Deliberately comma-only (unlike
+  // splitArtistNames below) since franchise/character names can
+  // legitimately contain "&" (e.g. "Cloak & Dagger").
+  function splitCsv_(raw) {
+    if (!raw) return [];
+    return String(raw).split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+  }
+
   // PERF: the backend's artwork autofill always stores Apple/iTunes cover
   // art at a fixed 1200x1200 (good for the detail-page hero, way more
   // than a 120px grid thumbnail needs). Apple's CDN happily serves any
@@ -819,6 +867,22 @@
   var releasesLoaded = false;
   var top5Loaded = false;
   var encyclopediaLoaded = false;
+
+  // NEW: "Browse by Franchise" state
+  var lyricsBrowseMode = 'artist'; // 'artist' | 'franchise'
+  var allFranchises = [];
+  var allCharacters = [];
+  var franchisesLoaded = false;
+  var charactersLoaded = false;
+  var franchiseSortDir = 'asc';
+  var franchiseSearchQuery = '';
+  var currentFranchiseDetail = null;      // franchise name, while viewing its character grid
+  var franchiseCharSortDir = 'asc';
+  var franchiseCharSearchQuery = '';
+  var currentFranchiseCharDetail = null;  // {franchise, character}, while viewing a character's songs
+  var currentFranchiseAllDetail = null;   // franchise name, while viewing "all songs" for it
+  var franchiseSongsSortDir = 'asc';
+  var franchiseSongsSearchQuery = '';
 
   // FLOATING PLAYER LOGIC
   function openFloatingPlayer(url) {
@@ -951,7 +1015,7 @@
   })();
 
   function hideAllViews() {
-    ['home','lyrics-list','lyrics-detail','artist-detail','encyclopedia','releases','top5','indiemonday','about'].forEach(function (v) {
+    ['home','lyrics-list','lyrics-detail','artist-detail','franchise-detail','franchise-songs','encyclopedia','releases','top5','indiemonday','about'].forEach(function (v) {
       document.getElementById('view-' + v).style.display = 'none';
     });
     document.querySelectorAll('.nav-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -974,7 +1038,11 @@
     setActiveTab('lyrics');
     setPath('lyrics');
     currentArtistDetail = null;
+    currentFranchiseDetail = null;
+    currentFranchiseCharDetail = null;
+    currentFranchiseAllDetail = null;
     if (!lyricsLoaded) loadLyrics(); else loadArtistsData();
+    if (lyricsBrowseMode === 'franchise' && !franchisesLoaded) loadFranchiseBrowse();
   }
   function showArtistDetail(name) {
     hideAllViews();
@@ -982,6 +1050,9 @@
     setActiveTab('lyrics');
     setPath('artist-' + encodeURIComponent(name));
     currentArtistDetail = name;
+    currentFranchiseDetail = null;
+    currentFranchiseCharDetail = null;
+    currentFranchiseAllDetail = null;
     artistDetailSortDir = 'asc';
     artistDetailSearchQuery = '';
     if (!lyricsLoaded) {
@@ -1110,6 +1181,14 @@
     if (path === 'lyrics') { showLyricsList(); return; }
     if (path.indexOf('artist-') === 0) { showArtistDetail(decodeURIComponent(path.slice(7))); return; }
     if (path.indexOf('lyric-') === 0) { showLyricsDetail(path.slice(6)); return; }
+    // NEW: franchise/<name>  |  franchise/<name>/all  |  franchise/<name>/char/<character>
+    if (path.indexOf('franchise/') === 0) {
+      var rest = path.slice('franchise/'.length);
+      var segs = rest.split('/');
+      if (segs.length === 1 && segs[0]) { showFranchiseDetail(decodeURIComponent(segs[0])); return; }
+      if (segs.length === 2 && segs[1] === 'all') { showFranchiseAllSongs(decodeURIComponent(segs[0])); return; }
+      if (segs.length === 3 && segs[1] === 'char') { showFranchiseCharacterDetail(decodeURIComponent(segs[0]), decodeURIComponent(segs[2])); return; }
+    }
     if (path === 'encyclopedia') { showEncyclopedia(); return; }
     if (path === 'releases') { showReleases(); return; }
     if (path === 'top5') { showTop5(); return; }
@@ -1137,6 +1216,21 @@
       document.querySelectorAll('#view-releases .subpane').forEach(function (p) { p.classList.remove('active'); });
       tab.classList.add('active');
       document.getElementById('relpane-' + pane).classList.add('active');
+    });
+  });
+
+  // NEW: "BY ARTIST" / "BY FRANCHISE" browse-mode subtabs on the Lyrics page
+  document.querySelectorAll('#lyrics-browse-tabs .subtab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var mode = tab.getAttribute('data-browsemode');
+      lyricsBrowseMode = mode;
+      document.querySelectorAll('#lyrics-browse-tabs .subtab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('browsepane-artist').classList.toggle('active', mode === 'artist');
+      document.getElementById('browsepane-franchise').classList.toggle('active', mode === 'franchise');
+      if (mode === 'franchise') {
+        if (!franchisesLoaded) loadFranchiseBrowse(); else renderFranchiseGrid();
+      }
     });
   });
 
@@ -1263,14 +1357,15 @@
     return parts.map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
   }
 
-  // Normalizes an artist name into a stable lookup key: trims, collapses
-  // any run of whitespace (including stray double-spaces or non-breaking
-  // spaces that sometimes creep in from copy/pasting) down to a single
-  // space, and lowercases. Used everywhere an artist name from the
-  // Lyrics sheet needs to be matched against an artist name on the
-  // Artists sheet (e.g. to find its PFP or its "Is Hidden" flag), so
-  // small formatting differences between the two sheets don't cause a
-  // false non-match.
+  // Normalizes a name into a stable lookup key: trims, collapses any run
+  // of whitespace (including stray double-spaces or non-breaking spaces
+  // that sometimes creep in from copy/pasting) down to a single space,
+  // and lowercases. Used everywhere a name from the Lyrics sheet needs to
+  // be matched against a name on the Artists/Franchises/Characters sheet
+  // (e.g. to find its image or its "Is Hidden" flag), so small formatting
+  // differences between sheets don't cause a false non-match. Despite the
+  // name, this is used generically for artists, franchises, AND
+  // characters alike.
   function normalizeArtistKey(name) {
     return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
@@ -1396,6 +1491,388 @@
     renderArtistGrid();
   });
 
+  // ----------------------------------------------------------------------
+  // BROWSE BY FRANCHISE
+  // ----------------------------------------------------------------------
+  function loadFranchiseBrowse() {
+    document.getElementById('franchise-grid-content').innerHTML = '<div class="loading">Loading franchises&hellip;</div>';
+    var lyricsPromise = lyricsLoaded ? Promise.resolve(allLyrics) : api('lyrics');
+    var franchisesPromise = franchisesLoaded ? Promise.resolve(allFranchises) : api('franchises').catch(function () { return []; });
+
+    Promise.all([lyricsPromise, franchisesPromise]).then(function (results) {
+      if (!lyricsLoaded) { allLyrics = results[0] || []; lyricsLoaded = true; }
+      if (!franchisesLoaded) { allFranchises = results[1] || []; franchisesLoaded = true; }
+      renderFranchiseGrid();
+    }).catch(function (err) {
+      renderErrorWithRetry(document.getElementById('franchise-grid-content'),
+        "Couldn't load franchises: " + escapeHtml(err.message || err), loadFranchiseBrowse);
+    });
+  }
+
+  function uniqueFranchiseList() {
+    var metaMap = {};
+    var hiddenMap = {};
+    allFranchises.forEach(function (f) {
+      var key = normalizeArtistKey(f.franchise);
+      if (!key) return;
+      metaMap[key] = f;
+      if (f.hidden) hiddenMap[key] = true;
+    });
+    var seen = {};
+    var names = [];
+    allLyrics.forEach(function (item) {
+      if (isNA(item.franchise)) return;
+      splitCsv_(item.franchise).forEach(function (name) {
+        var key = normalizeArtistKey(name);
+        if (seen[key]) return;
+        seen[key] = true;
+        if (hiddenMap[key]) return;
+        names.push(name);
+      });
+    });
+    var q = franchiseSearchQuery.trim().toLowerCase();
+    if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
+    names.sort(function (a, b) {
+      return franchiseSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    });
+    return names.map(function (n) {
+      var meta = metaMap[normalizeArtistKey(n)] || {};
+      return { franchise: n, category: meta.category || '', image: meta.image || '' };
+    });
+  }
+
+  function renderFranchiseGrid() {
+    var container = document.getElementById('franchise-grid-content');
+    var list = uniqueFranchiseList();
+    if (!list.length) { container.innerHTML = '<div class="empty">No franchises tagged yet. Add a "Franchise" column to your Lyrics sheet to get started.</div>'; return; }
+    var fallback = getFallbackImage();
+    container.innerHTML = '<div class="artist-grid">' + list.map(function (f) {
+      var img = f.image ? escapeHtml(optimizeArtUrl(f.image, 300)) : fallback;
+      var catHtml = f.category ? '<div class="franchise-cat">' + escapeHtml(f.category.toUpperCase()) + '</div>' : '';
+      return (
+        '<div class="artist-card" data-franchise="' + escapeHtml(f.franchise) + '">' +
+          '<img src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
+          '<div class="name">' + escapeHtml(f.franchise) + '</div>' +
+          catHtml +
+        '</div>'
+      );
+    }).join('') + '</div>';
+
+    container.querySelectorAll('.artist-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        showFranchiseDetail(card.getAttribute('data-franchise'));
+      });
+    });
+  }
+
+  document.getElementById('franchise-search').addEventListener('input', debounce_(function () {
+    franchiseSearchQuery = this.value;
+    renderFranchiseGrid();
+  }, 120));
+
+  document.getElementById('franchise-sort-toggle').addEventListener('click', function () {
+    franchiseSortDir = franchiseSortDir === 'asc' ? 'desc' : 'asc';
+    var first = franchiseSortDir === 'asc' ? 'A' : 'Z';
+    var second = franchiseSortDir === 'asc' ? 'Z' : 'A';
+    this.innerHTML = 'SORT: ' + first + '<span class="sort-arrow">&#8594;</span>' + second;
+    renderFranchiseGrid();
+  });
+
+  function franchiseSongs_(name) {
+    var key = normalizeArtistKey(name);
+    return allLyrics.filter(function (item) {
+      return !isNA(item.franchise) && splitCsv_(item.franchise).some(function (f) { return normalizeArtistKey(f) === key; });
+    });
+  }
+
+  function uniqueCharactersForFranchise_(name) {
+    var metaMap = {};
+    var hiddenMap = {};
+    allCharacters.forEach(function (c) {
+      var ck = normalizeArtistKey(c.character);
+      if (!ck) return;
+      metaMap[ck] = c;
+      if (c.hidden) hiddenMap[ck] = true;
+    });
+    var seen = {};
+    var names = [];
+    franchiseSongs_(name).forEach(function (item) {
+      if (isNA(item.character)) return;
+      splitCsv_(item.character).forEach(function (c) {
+        var ck = normalizeArtistKey(c);
+        if (seen[ck]) return;
+        seen[ck] = true;
+        if (hiddenMap[ck]) return;
+        names.push(c);
+      });
+    });
+    var q = franchiseCharSearchQuery.trim().toLowerCase();
+    if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
+    names.sort(function (a, b) {
+      return franchiseCharSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    });
+    return names.map(function (n) {
+      var meta = metaMap[normalizeArtistKey(n)] || {};
+      return { character: n, image: meta.image || '' };
+    });
+  }
+
+  function showFranchiseDetail(name) {
+    hideAllViews();
+    document.getElementById('view-franchise-detail').style.display = '';
+    setActiveTab('lyrics');
+    setPath('franchise/' + encodeURIComponent(name));
+    currentFranchiseDetail = name;
+    currentFranchiseCharDetail = null;
+    currentFranchiseAllDetail = null;
+    currentArtistDetail = null;
+    franchiseCharSortDir = 'asc';
+    franchiseCharSearchQuery = '';
+
+    if (!lyricsLoaded || !charactersLoaded) {
+      document.getElementById('franchise-detail-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
+      var lyricsPromise = lyricsLoaded ? Promise.resolve(allLyrics) : api('lyrics');
+      var charsPromise = charactersLoaded ? Promise.resolve(allCharacters) : api('characters').catch(function () { return []; });
+      Promise.all([lyricsPromise, charsPromise]).then(function (r) {
+        if (!lyricsLoaded) { allLyrics = r[0] || []; lyricsLoaded = true; }
+        if (!charactersLoaded) { allCharacters = r[1] || []; charactersLoaded = true; }
+        renderFranchiseDetail(name);
+      }).catch(function (err) {
+        renderErrorWithRetry(document.getElementById('franchise-detail-content'),
+          "Couldn't load characters: " + escapeHtml(err.message || err), function () { showFranchiseDetail(name); });
+      });
+    } else {
+      renderFranchiseDetail(name);
+    }
+  }
+
+  function renderFranchiseDetail(name) {
+    var container = document.getElementById('franchise-detail-content');
+    var songs = franchiseSongs_(name);
+    var fallback = getFallbackImage();
+    var meta = allFranchises.filter(function (f) { return normalizeArtistKey(f.franchise) === normalizeArtistKey(name); })[0] || {};
+    var heroImg = meta.image ? optimizeArtUrl(meta.image, 440) : fallback;
+
+    var header =
+      '<div class="detail-hero">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(heroImg) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
+        '<div class="detail-hero-text">' +
+          '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
+          '<div class="detail-meta"><span>' + songs.length + (songs.length === 1 ? ' song' : ' songs') + '</span>' +
+          (meta.category ? '<span>' + escapeHtml(meta.category) + '</span>' : '') + '</div>' +
+        '</div>' +
+      '</div>';
+
+    var allSongsTile =
+      '<div class="lyric-card" id="franchise-all-songs-tile" style="margin-bottom:22px;">' +
+        '<div class="lyric-body" style="padding:18px;">' +
+          '<p class="lyric-title">&#9654; VIEW ALL ' + escapeHtml(name.toUpperCase()) + ' SONGS</p>' +
+          '<p class="lyric-artist">' + songs.length + (songs.length === 1 ? ' song' : ' songs') + ' total, any character</p>' +
+        '</div>' +
+      '</div>';
+
+    var characters = uniqueCharactersForFranchise_(name);
+
+    var toolbarRow =
+      '<div class="artist-detail-toolbar">' +
+        '<input type="text" class="search-box artist-detail-search" id="franchise-char-search" placeholder="Search characters&hellip;" value="' + escapeHtml(franchiseCharSearchQuery) + '">' +
+        '<div class="nav-tab" id="franchise-char-sort-toggle">SORT: ' + (franchiseCharSortDir === 'asc' ? 'A<span class="sort-arrow">&#8594;</span>Z' : 'Z<span class="sort-arrow">&#8594;</span>A') + '</div>' +
+      '</div>';
+
+    var gridHtml;
+    if (!characters.length) {
+      gridHtml = '<div class="empty">No characters tagged for this franchise yet.</div>';
+    } else {
+      gridHtml = '<div class="artist-grid">' + characters.map(function (c) {
+        var img = c.image ? escapeHtml(optimizeArtUrl(c.image, 300)) : fallback;
+        return (
+          '<div class="artist-card" data-character="' + escapeHtml(c.character) + '">' +
+            '<img src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
+            '<div class="name">' + escapeHtml(c.character) + '</div>' +
+          '</div>'
+        );
+      }).join('') + '</div>';
+    }
+
+    container.innerHTML = header + allSongsTile + toolbarRow + gridHtml;
+
+    document.getElementById('franchise-all-songs-tile').addEventListener('click', function () {
+      showFranchiseAllSongs(name);
+    });
+
+    container.querySelectorAll('[data-character]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        showFranchiseCharacterDetail(name, card.getAttribute('data-character'));
+      });
+    });
+
+    var sortToggle = document.getElementById('franchise-char-sort-toggle');
+    if (sortToggle) {
+      sortToggle.addEventListener('click', function () {
+        franchiseCharSortDir = franchiseCharSortDir === 'asc' ? 'desc' : 'asc';
+        renderFranchiseDetail(name);
+      });
+    }
+    var searchInput = document.getElementById('franchise-char-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        franchiseCharSearchQuery = this.value;
+        var caret = this.selectionStart;
+        renderFranchiseDetail(name);
+        var freshInput = document.getElementById('franchise-char-search');
+        if (freshInput) { freshInput.focus(); try { freshInput.setSelectionRange(caret, caret); } catch (e) { } }
+      });
+    }
+  }
+
+  function showFranchiseCharacterDetail(franchise, character) {
+    hideAllViews();
+    document.getElementById('view-franchise-songs').style.display = '';
+    setActiveTab('lyrics');
+    setPath('franchise/' + encodeURIComponent(franchise) + '/char/' + encodeURIComponent(character));
+    currentFranchiseCharDetail = { franchise: franchise, character: character };
+    currentFranchiseAllDetail = null;
+    currentArtistDetail = null;
+    franchiseSongsSortDir = 'asc';
+    franchiseSongsSearchQuery = '';
+
+    function render() {
+      var fKey = normalizeArtistKey(franchise), cKey = normalizeArtistKey(character);
+      var songs = allLyrics.filter(function (item) {
+        return !isNA(item.franchise) && !isNA(item.character) &&
+          splitCsv_(item.franchise).some(function (f) { return normalizeArtistKey(f) === fKey; }) &&
+          splitCsv_(item.character).some(function (c) { return normalizeArtistKey(c) === cKey; });
+      });
+      renderFranchiseSongsPage_(character, franchise, songs);
+    }
+
+    if (!lyricsLoaded) {
+      document.getElementById('franchise-songs-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
+      api('lyrics').then(function (list) {
+        allLyrics = list || []; lyricsLoaded = true; render();
+      }).catch(function (err) {
+        renderErrorWithRetry(document.getElementById('franchise-songs-content'),
+          "Couldn't load songs: " + escapeHtml(err.message || err), function () { showFranchiseCharacterDetail(franchise, character); });
+      });
+    } else {
+      render();
+    }
+  }
+
+  function showFranchiseAllSongs(franchise) {
+    hideAllViews();
+    document.getElementById('view-franchise-songs').style.display = '';
+    setActiveTab('lyrics');
+    setPath('franchise/' + encodeURIComponent(franchise) + '/all');
+    currentFranchiseAllDetail = franchise;
+    currentFranchiseCharDetail = null;
+    currentArtistDetail = null;
+    franchiseSongsSortDir = 'asc';
+    franchiseSongsSearchQuery = '';
+
+    function render() {
+      renderFranchiseSongsPage_(franchise, 'All songs', franchiseSongs_(franchise));
+    }
+
+    if (!lyricsLoaded) {
+      document.getElementById('franchise-songs-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
+      api('lyrics').then(function (list) {
+        allLyrics = list || []; lyricsLoaded = true; render();
+      }).catch(function (err) {
+        renderErrorWithRetry(document.getElementById('franchise-songs-content'),
+          "Couldn't load songs: " + escapeHtml(err.message || err), function () { showFranchiseAllSongs(franchise); });
+      });
+    } else {
+      render();
+    }
+  }
+
+  // Shared renderer for both "a character's songs" and "all songs in a
+  // franchise" — same look as an artist's song list, with its own
+  // search box + A-Z/Z-A sort.
+  function renderFranchiseSongsPage_(title, subtitle, songsForPage) {
+    var container = document.getElementById('franchise-songs-content');
+    var fallback = getFallbackImage();
+
+    var sorted = songsForPage.slice().sort(function (a, b) {
+      var cmp = String(a.title || '').localeCompare(String(b.title || ''));
+      return franchiseSongsSortDir === 'asc' ? cmp : -cmp;
+    });
+
+    var header =
+      '<div class="detail-hero">' +
+        '<div class="detail-hero-text" style="padding:26px;">' +
+          '<h1 class="detail-title">' + escapeHtml(title) + '</h1>' +
+          '<div class="detail-meta"><span>' + escapeHtml(subtitle) + '</span><span>' + sorted.length + (sorted.length === 1 ? ' song' : ' songs') + '</span></div>' +
+        '</div>' +
+      '</div>';
+
+    if (!sorted.length) {
+      container.innerHTML = header + '<div class="empty">No songs found.</div>';
+      return;
+    }
+
+    var q = franchiseSongsSearchQuery.trim().toLowerCase();
+    var songs = q ? sorted.filter(function (s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; }) : sorted;
+
+    var toolbarRow =
+      '<div class="artist-detail-toolbar">' +
+        '<input type="text" class="search-box artist-detail-search" id="franchise-songs-search" placeholder="Search songs&hellip;" value="' + escapeHtml(franchiseSongsSearchQuery) + '">' +
+        '<div class="nav-tab" id="franchise-songs-sort-toggle">SORT: ' + (franchiseSongsSortDir === 'asc' ? 'A<span class="sort-arrow">&#8594;</span>Z' : 'Z<span class="sort-arrow">&#8594;</span>A') + '</div>' +
+      '</div>';
+
+    var cardsHtml = !songs.length ? '<div class="empty">No songs match your search.</div>' : songs.map(function (item) {
+      var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 240)) : fallback;
+      var lockedClass = item.isLocked ? ' locked' : '';
+      var badge = item.isLocked ? '<span class="badge locked">Locked</span>' : (item.isUpcoming ? '<span class="badge upcoming">Upcoming</span>' : '');
+      return (
+        '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
+          '<img class="lyric-cover" src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
+          '<div class="lyric-body">' +
+            '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
+            '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
+            '<div class="lyric-meta-row">' + badge + '</div>' +
+            '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    container.innerHTML = header + toolbarRow + cardsHtml;
+
+    var sortToggle = document.getElementById('franchise-songs-sort-toggle');
+    if (sortToggle) {
+      sortToggle.addEventListener('click', function () {
+        franchiseSongsSortDir = franchiseSongsSortDir === 'asc' ? 'desc' : 'asc';
+        renderFranchiseSongsPage_(title, subtitle, songsForPage);
+      });
+    }
+
+    var searchInput = document.getElementById('franchise-songs-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        franchiseSongsSearchQuery = this.value;
+        var caret = this.selectionStart;
+        renderFranchiseSongsPage_(title, subtitle, songsForPage);
+        var freshInput = document.getElementById('franchise-songs-search');
+        if (freshInput) { freshInput.focus(); try { freshInput.setSelectionRange(caret, caret); } catch (e) { } }
+      });
+    }
+
+    container.querySelectorAll('.lyric-card[data-id]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        if (card.getAttribute('data-locked') === 'true') return;
+        showLyricsDetail(card.getAttribute('data-id'));
+      });
+    });
+  }
+
+  document.getElementById('franchise-songs-back').addEventListener('click', function () {
+    if (currentFranchiseCharDetail) showFranchiseDetail(currentFranchiseCharDetail.franchise);
+    else if (currentFranchiseAllDetail) showFranchiseDetail(currentFranchiseAllDetail);
+    else showLyricsList();
+  });
+
   // ARTIST DETAIL — songs by one artist, with a search box + sort toggle.
   function renderArtistDetail(name) {
     var container = document.getElementById('artist-detail-content');
@@ -1497,7 +1974,9 @@
   }
 
   document.getElementById('lyric-detail-back').addEventListener('click', function () {
-    if (currentArtistDetail) showArtistDetail(currentArtistDetail);
+    if (currentFranchiseCharDetail) showFranchiseCharacterDetail(currentFranchiseCharDetail.franchise, currentFranchiseCharDetail.character);
+    else if (currentFranchiseAllDetail) showFranchiseAllSongs(currentFranchiseAllDetail);
+    else if (currentArtistDetail) showArtistDetail(currentArtistDetail);
     else showLyricsList();
   });
 
@@ -1554,6 +2033,25 @@
     }
     if (post.youtube) streamBtns += '<button class="stream-btn youtube" onclick="openFloatingPlayer(\'' + escapeHtml(post.youtube) + '\')">&#9654; Watch Video</button>';
 
+    // NEW: franchise/character tag badges — clicking one jumps straight
+    // into that franchise/character's browse view.
+    var tagsHtml = '';
+    if (!isNA(post.franchise) || !isNA(post.character)) {
+      var firstFranchise = !isNA(post.franchise) ? splitCsv_(post.franchise)[0] : '';
+      var tagBits = [];
+      if (!isNA(post.franchise)) {
+        splitCsv_(post.franchise).forEach(function (f) {
+          tagBits.push('<span class="badge ep" style="cursor:pointer;" data-tag-franchise="' + escapeHtml(f) + '">' + escapeHtml(f) + '</span>');
+        });
+      }
+      if (!isNA(post.character)) {
+        splitCsv_(post.character).forEach(function (c) {
+          tagBits.push('<span class="badge album" style="cursor:pointer;" data-tag-character="' + escapeHtml(c) + '" data-tag-character-franchise="' + escapeHtml(firstFranchise) + '">' + escapeHtml(c) + '</span>');
+        });
+      }
+      tagsHtml = '<div class="lyric-meta-row" style="margin-top:10px;">' + tagBits.join(' ') + '</div>';
+    }
+
     container.innerHTML =
       '<div class="detail-hero">' +
         '<span class="report-btn-corner" id="lyric-report-btn">&#9873; REPORT ISSUE</span>' +
@@ -1561,6 +2059,7 @@
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(post.title) + '</h1>' +
           '<div class="detail-meta"><span>by <b>' + escapeHtml(post.artist) + '</b></span><span>' + escapeHtml(post.dateStr) + '</span></div>' +
+          tagsHtml +
         '</div>' +
       '</div>' +
       (streamBtns ? '<div class="stream-row">' + streamBtns + '</div>' : '') +
@@ -1572,6 +2071,17 @@
         openBugReportModal({ id: post.id, title: post.title, artist: post.artist });
       });
     }
+
+    container.querySelectorAll('[data-tag-franchise]').forEach(function (el) {
+      el.addEventListener('click', function () { showFranchiseDetail(el.getAttribute('data-tag-franchise')); });
+    });
+    container.querySelectorAll('[data-tag-character]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var fr = el.getAttribute('data-tag-character-franchise');
+        if (fr) showFranchiseCharacterDetail(fr, el.getAttribute('data-tag-character'));
+        else showFranchiseDetail(el.getAttribute('data-tag-character'));
+      });
+    });
   }
 
   // RELEASES
