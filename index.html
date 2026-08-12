@@ -6,6 +6,18 @@
 <title>Nerdcore Archive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- PERF: preconnect to the CDNs actual artwork/cover URLs come from, so
+     the browser has the connection (DNS+TLS) ready before it ever parses
+     the <img> tags that need them, instead of paying that latency per-image. -->
+<link rel="preconnect" href="https://is1-ssl.mzstatic.com" crossorigin>
+<link rel="preconnect" href="https://is2-ssl.mzstatic.com" crossorigin>
+<link rel="preconnect" href="https://is3-ssl.mzstatic.com" crossorigin>
+<link rel="preconnect" href="https://is4-ssl.mzstatic.com" crossorigin>
+<link rel="preconnect" href="https://is5-ssl.mzstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.genius.com" crossorigin>
+<link rel="preconnect" href="https://i.scdn.co" crossorigin>
+<link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://placehold.co" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -554,17 +566,6 @@
       <h3>ENCYCLOPEDIA</h3>
       <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
     </div>
-    <!-- INDIE MONDAY -->
-    <div class="page" id="view-indiemonday" style="display:none">
-      <span class="back-link" data-route="home">&larr; Back to Home</span>
-      <div class="page-head">
-        <div class="eyebrow">WEEKLY SPOTLIGHT</div>
-        <h1>INDIE MONDAY</h1>
-        <p>Nerdcore artists featured on the Indie Monday blog.</p>
-      </div>
-      <div data-disclaimer-page="indiemonday"></div>
-      <div id="indiemonday-content"><div class="loading">Loading&hellip;</div></div>
-    </div>
     <div class="home-tile" data-route="about">
       <div class="tag">WHO'S BEHIND THIS</div>
       <h3>ABOUT ME</h3>
@@ -672,7 +673,7 @@
     <p>Nerdcore artists featured on the Indie Monday blog.</p>
   </div>
   <div data-disclaimer-page="indiemonday"></div>
-  <div class="empty">This section is under construction. Check back soon!</div>
+  <div id="indiemonday-content"><div class="loading">Loading&hellip;</div></div>
 </div>
 
 <!-- ABOUT -->
@@ -720,7 +721,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw4xfqEUEE-tXurDaUN2K94Kr9O-DoPPUd5jkOVgj8O6uC6JjA7CcuZmnMCOhT1L7TS/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycby4lKtKGG8zuqW__pqTyzo9olcv8zxZlcrqUZvraKEargnzqXqdttfhoDJWHC9jC_HB/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -783,6 +784,25 @@
   }
   function getFallbackImage() {
     return (siteSettings && siteSettings.defaultImage) || 'https://placehold.co/220x220/141831/3dff8f?text=%3F';
+  }
+
+  // PERF: the backend's artwork autofill always stores Apple/iTunes cover
+  // art at a fixed 1200x1200 (good for the detail-page hero, way more
+  // than a 120px grid thumbnail needs). Apple's CDN happily serves any
+  // WxH baked into the filename, so this swaps in the actual pixel size
+  // needed for wherever the image is being displayed — a small artist
+  // grid tile downloads a small file instead of the same 1200x1200 master
+  // every other context uses. `size` should be roughly 2x the CSS pixel
+  // size, for retina screens without over-fetching. Only touches Apple's
+  // CDN URLs; anything else (Genius, Drive, a custom link) passes through
+  // unchanged since those don't support this kind of resizing.
+  function optimizeArtUrl(url, size) {
+    if (!url) return url;
+    var str = String(url);
+    if (/\.mzstatic\.com\//i.test(str)) {
+      return str.replace(/\d+x\d+bb\.(jpg|jpeg|png)(\?.*)?$/i, size + 'x' + size + 'bb.$1$2');
+    }
+    return str;
   }
 
   var siteSettings = { defaultImage: '', siteTitle: 'NERDCORE<br>ARCHIVE', tagline: '', social: {} };
@@ -1062,12 +1082,12 @@
     }
     var fallback = getFallbackImage();
     container.innerHTML = list.map(function (item) {
-      var img = item.image ? escapeHtml(item.image) : fallback;
+      var img = item.image ? escapeHtml(optimizeArtUrl(item.image, 280)) : fallback;
       var blurbHtml = item.blurb ? '<p class="im-blurb">' + escapeHtml(item.blurb) + '</p>' : '';
       var dateHtml = item.dateStr ? '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' : '';
       return (
         '<div class="im-card">' +
-          '<img class="im-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
+          '<img class="im-cover" src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
           '<div class="im-body">' +
             '<p class="im-artist">' + escapeHtml(item.artist) + '</p>' +
             blurbHtml +
@@ -1187,7 +1207,7 @@
   function renderAboutContent() {
     var container = document.getElementById('about-content');
     var fallback = getFallbackImage();
-    var pfp = (siteSettings && siteSettings.aboutPfp) ? siteSettings.aboutPfp : fallback;
+    var pfp = (siteSettings && siteSettings.aboutPfp) ? optimizeArtUrl(siteSettings.aboutPfp, 320) : fallback;
     var name = (siteSettings && (siteSettings.aboutName || siteSettings.siteTitle))
       ? String(siteSettings.aboutName || siteSettings.siteTitle).replace(/<br\s*\/?>/gi, ' ')
       : 'THE ARCHIVIST';
@@ -1199,7 +1219,7 @@
     container.innerHTML =
       '<div class="about-hero">' +
         '<div class="about-avatar-wrap">' +
-          '<img src="' + escapeHtml(pfp) + '" onerror="this.src=\'' + fallback + '\'">' +
+          '<img src="' + escapeHtml(pfp) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
         '</div>' +
         '<h1 class="about-name">' + escapeHtml(name) + '</h1>' +
         '<div class="about-rule"></div>' +
@@ -1255,11 +1275,24 @@
     return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  // PERF: was api('lyrics').then(...) -> THEN starts api('artists') only
+  // after lyrics finishes — two sequential round trips on first visit to
+  // the Lyrics tab. Firing both requests together and waiting on whichever
+  // finishes last cuts that latency roughly in half.
   function loadLyrics() {
-    api('lyrics').then(function (list) {
+    var lyricsPromise = api('lyrics');
+    var artistsPromise = artistsLoaded ? Promise.resolve(null) : api('artists').catch(function () { return null; });
+
+    lyricsPromise.then(function (list) {
       lyricsLoaded = true;
       allLyrics = list || [];
-      loadArtistsData();
+      return artistsPromise;
+    }).then(function (artistList) {
+      if (!artistsLoaded) {
+        artistsLoaded = true;
+        allArtists = artistList || []; // non-fatal if this came back empty/null — grid still works, just without photos
+      }
+      renderArtistGrid();
     }).catch(function (err) {
       renderErrorWithRetry(document.getElementById('artist-grid-content'),
         "Couldn't load lyrics: " + escapeHtml(err.message || err), loadLyrics);
@@ -1322,10 +1355,10 @@
     if (!list.length) { container.innerHTML = '<div class="empty">No artists found.</div>'; return; }
     var fallback = getFallbackImage();
     container.innerHTML = '<div class="artist-grid">' + list.map(function (a) {
-      var img = a.pfp ? escapeHtml(a.pfp) : fallback;
+      var img = a.pfp ? escapeHtml(optimizeArtUrl(a.pfp, 300)) : fallback;
       return (
         '<div class="artist-card" data-artist="' + escapeHtml(a.artist) + '">' +
-          '<img src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
+          '<img src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
           '<div class="name">' + escapeHtml(a.artist) + '</div>' +
         '</div>'
       );
@@ -1338,10 +1371,22 @@
     });
   }
 
-  document.getElementById('artist-search').addEventListener('input', function () {
+  // PERF: tiny debounce so fast typing doesn't force a full grid re-render
+  // on every single keystroke — still feels instant at 120ms, just skips
+  // the redundant in-between renders.
+  function debounce_(fn, waitMs) {
+    var t;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, waitMs);
+    };
+  }
+
+  document.getElementById('artist-search').addEventListener('input', debounce_(function () {
     artistSearchQuery = this.value;
     renderArtistGrid();
-  });
+  }, 120));
 
   document.getElementById('artist-sort-toggle').addEventListener('click', function () {
     artistSortDir = artistSortDir === 'asc' ? 'desc' : 'asc';
@@ -1373,7 +1418,7 @@
 
     var header =
       '<div class="detail-hero">' +
-        '<img class="detail-hero-img" src="' + escapeHtml(pfp) + '" onerror="this.src=\'' + fallback + '\'">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(optimizeArtUrl(pfp, 440)) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
           '<div class="detail-meta"><span>' + allSongs.length + (allSongs.length === 1 ? ' song' : ' songs') + '</span></div>' +
@@ -1401,13 +1446,13 @@
       cardsHtml = '<div class="empty">No songs match your search.</div>';
     } else {
       cardsHtml = songs.map(function (item) {
-        var img = item.cover ? escapeHtml(item.cover) : fallback;
+        var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 240)) : fallback;
         var lockedClass = item.isLocked ? ' locked' : '';
         var badge = item.isLocked ? '<span class="badge locked">Locked</span>' :
           (item.isUpcoming ? '<span class="badge upcoming">Upcoming</span>' : '');
         return (
           '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
-            '<img class="lyric-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
+            '<img class="lyric-cover" src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
             '<div class="lyric-body">' +
               '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
               '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
@@ -1488,7 +1533,7 @@
     if (post.isLocked) { container.innerHTML = '<div class="empty">This one is locked until its release date.</div>'; return; }
 
     var fallback = getFallbackImage();
-    var img = post.cover || fallback;
+    var img = post.cover ? optimizeArtUrl(post.cover, 440) : fallback;
 
     // Spotify and Apple Music now open inline in the same floating
     // player used for YouTube, instead of redirecting off-site. Falls
@@ -1512,7 +1557,7 @@
     container.innerHTML =
       '<div class="detail-hero">' +
         '<span class="report-btn-corner" id="lyric-report-btn">&#9873; REPORT ISSUE</span>' +
-        '<img class="detail-hero-img" src="' + escapeHtml(img) + '" onerror="this.src=\'' + fallback + '\'">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(img) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(post.title) + '</h1>' +
           '<div class="detail-meta"><span>by <b>' + escapeHtml(post.artist) + '</b></span><span>' + escapeHtml(post.dateStr) + '</span></div>' +
@@ -1903,7 +1948,7 @@
         '<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>' +
         '<div class="enc-page-inner" id="enc-page-inner">' +
           '<div class="enc-page-zone left" id="enc-zone-prev" title="Previous page"></div>' +
-          '<img id="enc-page-img" alt="Encyclopedia page">' +
+          '<img id="enc-page-img" alt="Encyclopedia page" decoding="async">' +
           '<div class="enc-page-zone right" id="enc-zone-next" title="Next page"></div>' +
         '</div>' +
       '</div>' +
