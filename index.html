@@ -276,6 +276,35 @@
   .artist-detail-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
   .artist-detail-search{ flex:1; min-width:180px; }
 
+  /* ---------- disclaimer banner ---------- */
+  .disclaimer-banner{
+    background:rgba(255,182,39,0.08); border:2px solid var(--amber);
+    color:var(--amber); font-family:'VT323', monospace; font-size:17px;
+    padding:12px 16px; margin-bottom:20px; line-height:1.5;
+  }
+
+  /* ---------- indie monday spotlight cards ---------- */
+  .im-card{
+    display:flex; gap:0; align-items:stretch;
+    background:var(--panel); border:3px solid var(--border);
+    box-shadow:5px 5px 0 rgba(0,0,0,0.35); margin-bottom:16px; overflow:hidden;
+  }
+  .im-cover{ width:140px; height:140px; object-fit:cover; flex-shrink:0; border-right:3px solid var(--border); background:#0a0d1c; }
+  .im-body{ flex:1; min-width:0; padding:16px 18px; display:flex; flex-direction:column; justify-content:center; gap:6px; }
+  .im-artist{ font-family:'Press Start 2P', monospace; font-size:14px; color:var(--green); margin:0; line-height:1.6; }
+  .im-blurb{ font-family:'VT323', monospace; font-size:18px; color:var(--muted); margin:0; line-height:1.4; }
+  .im-link-btn{
+    display:inline-flex; align-items:center; gap:6px; align-self:flex-start;
+    margin-top:8px; font-family:'VT323', monospace; font-size:16px;
+    color:var(--amber); border:2px solid var(--amber); padding:6px 12px;
+    text-decoration:none; letter-spacing:0.3px;
+  }
+  .im-link-btn:hover{ background:var(--amber); color:#0b0e1a; }
+  @media(max-width:600px){
+    .im-card{ flex-direction:column; }
+    .im-cover{ width:100%; height:160px; border-right:none; border-bottom:3px solid var(--border); }
+  }
+
   /* ---------- releases ---------- */
   .release-day{ margin-bottom:30px; }
   .release-day-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:12px; border-bottom:2px solid var(--border); padding-bottom:8px; }
@@ -525,10 +554,20 @@
       <h3>ENCYCLOPEDIA</h3>
       <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
     </div>
-    <div class="home-tile" data-route="indiemonday">
-      <div class="tag">SIDE PROJECT</div>
-      <h3>INDIE MONDAY</h3>
-      <p>[PAGE UNDER CONSTRUCTION].</p>
+    <!-- INDIE MONDAY -->
+    <div class="page" id="view-indiemonday" style="display:none">
+      <span class="back-link" data-route="home">&larr; Back to Home</span>
+      <div class="page-head">
+        <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="home"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
+        <div class="eyebrow">WEEKLY SPOTLIGHT</div>
+        <h1>INDIE MONDAY</h1>
+        <p>Nerdcore artists featured on the Indie Monday blog.</p>
+      </div>
+      <div data-disclaimer-page="indiemonday"></div>
+      <div id="indiemonday-content"><div class="loading">Loading&hellip;</div></div>
     </div>
     <div class="home-tile" data-route="about">
       <div class="tag">WHO'S BEHIND THIS</div>
@@ -542,6 +581,10 @@
 <div class="page" id="view-lyrics-list" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="lyrics"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">BROWSE</div>
     <h1>LYRICS</h1>
     <p>Pick an artist to see their tracks.</p>
@@ -569,6 +612,10 @@
 <div class="page" id="view-encyclopedia" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="encyclopedia"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">REFERENCE</div>
     <h1>THE ENCYCLOPEDIA</h1>
     <p>The full Nerdcore Artist Encyclopedia of everyone in the scene.</p>
@@ -582,6 +629,10 @@
 <div class="page" id="view-releases" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="releases"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">CALENDAR-ISH</div>
     <h1>RELEASES</h1>
     <p>Tracks upcoming releases and songs dropped over the past month.</p>
@@ -600,6 +651,10 @@
 <div class="page" id="view-top5" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="top5"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">RANKINGS</div>
     <h1>NERDCORE AWARDS</h1>
     <p>Weekly top songs, the year's best songs, and more.</p>
@@ -629,9 +684,13 @@
 <div class="page" id="view-indiemonday" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="indiemonday"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">WEEKLY SPOTLIGHT</div>
     <h1>INDIE MONDAY</h1>
-    <p>[PAGE UNDER CONSTRUCTION]</p>
+    <p>Nerdcore artists featured on the Indie Monday blog.</p>
   </div>
   <div class="empty">This section is under construction. Check back soon!</div>
 </div>
@@ -640,6 +699,10 @@
 <div class="page" id="view-about" style="display:none">
   <span class="back-link" data-route="home">&larr; Back to Home</span>
   <div class="page-head">
+    <input type="text" class="search-box" id="artist-search" placeholder="Search artists&hellip;">
+  </div>
+  <div data-disclaimer-page="about"></div>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:18px;">
     <div class="eyebrow">WHO'S BEHIND THIS</div>
     <h1>ABOUT ME</h1>
   </div>
@@ -680,7 +743,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycby8hG7NpObNj4pVV586ILis9Dyif7LihecF0e8xc0Ki294AXY5me45TzUufSNRzQNgy/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw4xfqEUEE-tXurDaUN2K94Kr9O-DoPPUd5jkOVgj8O6uC6JjA7CcuZmnMCOhT1L7TS/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -973,6 +1036,7 @@
     document.getElementById('view-indiemonday').style.display = '';
     setActiveTab('indiemonday');
     setPath('indiemonday');
+    if (!indieMondayLoaded) loadIndieMonday();
   }
   function showAbout() {
     hideAllViews();
@@ -980,6 +1044,62 @@
     setActiveTab('about');
     setPath('about');
     loadAbout();
+  }
+
+  // DISCLAIMERS
+  var siteDisclaimers = {};
+
+  function loadDisclaimers() {
+    api('disclaimers').then(function (d) {
+      siteDisclaimers = d || {};
+      renderAllDisclaimers();
+    }).catch(function () { }); // non-fatal — pages just show no banner
+  }
+
+  function renderAllDisclaimers() {
+    document.querySelectorAll('[data-disclaimer-page]').forEach(function (el) {
+      var page = el.getAttribute('data-disclaimer-page');
+      var text = siteDisclaimers[page];
+      el.innerHTML = text ? '<div class="disclaimer-banner">&#9888; ' + escapeHtml(text) + '</div>' : '';
+    });
+  }
+
+  // INDIE MONDAY
+  var indieMondayLoaded = false;
+
+  function loadIndieMonday() {
+    var container = document.getElementById('indiemonday-content');
+    api('indieMonday').then(function (list) {
+      indieMondayLoaded = true;
+      renderIndieMonday(list || []);
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load Indie Monday spotlights: " + escapeHtml(err.message || err), loadIndieMonday);
+    });
+  }
+
+  function renderIndieMonday(list) {
+    var container = document.getElementById('indiemonday-content');
+    if (!list.length) {
+      container.innerHTML = '<div class="empty">No Indie Monday features posted yet. Check back soon!</div>';
+      return;
+    }
+    var fallback = getFallbackImage();
+    container.innerHTML = list.map(function (item) {
+      var img = item.image ? escapeHtml(item.image) : fallback;
+      var blurbHtml = item.blurb ? '<p class="im-blurb">' + escapeHtml(item.blurb) + '</p>' : '';
+      var dateHtml = item.dateStr ? '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' : '';
+      return (
+        '<div class="im-card">' +
+          '<img class="im-cover" src="' + img + '" loading="lazy" onerror="this.src=\'' + fallback + '\'">' +
+          '<div class="im-body">' +
+            '<p class="im-artist">' + escapeHtml(item.artist) + '</p>' +
+            blurbHtml +
+            dateHtml +
+            '<a class="im-link-btn" href="' + escapeHtml(item.link) + '" target="_blank" rel="noopener">&#9654; READ ON INDIE MONDAY</a>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
   }
 
   function setPath(p) {
@@ -1883,6 +2003,7 @@
   document.addEventListener('keydown', encKeyHandler);
 
   loadSettings();
+  loadDisclaimers();
   routeFromHash();
 </script>
 </body>
