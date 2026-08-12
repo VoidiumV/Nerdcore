@@ -591,7 +591,7 @@
   <div class="page-head">
     <div class="eyebrow">BROWSE</div>
     <h1>LYRICS</h1>
-    <p>Full lyric pages for every nerdcore song.</p>
+    <p>Pick an artist — or browse by franchise/show/character.</p>
   </div>
   <div data-disclaimer-page="lyrics"></div>
 
@@ -760,7 +760,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxxrs8pO8kT0I5OSZ2qMr9BEd9JWo5kro3JUWOoULixIP729mKbUCHAGVHSHWHFUsI/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxLIoTqeOXfnxkGTlVDfxgVA1HzzC2dtB_T-oMVSmU6lQvSRaLBi5ixICzM5_qgZsET/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -881,7 +881,11 @@
   var franchiseCharSearchQuery = '';
   var currentFranchiseCharDetail = null;  // {franchise, character}, while viewing a character's songs
   var currentFranchiseAllDetail = null;   // franchise name, while viewing "all songs" for it
-  var franchiseSongsSortDir = 'asc';
+  var currentFranchiseGeneralDetail = null; // franchise name, while viewing its "General / no character" songs
+  var currentFranchiseGeneralDetail = null; // franchise name, while viewing "general / no character" songs for it
+  var franchiseSongsSortDir = 'asc';        // direction for the current primary sort field (song title, or artist name)
+  var franchiseSongsSortField = 'song';     // 'song' | 'artist'
+  var franchiseSongsArtistSecondaryDir = 'asc'; // when sortField is 'artist', direction used for song titles within each artist
   var franchiseSongsSearchQuery = '';
 
   // FLOATING PLAYER LOGIC
@@ -936,7 +940,7 @@
       closeBugReportModal();
     }).catch(function () {
       btn.textContent = 'SUBMIT';
-      alert("Couldn't send the report... try again in a bit.");
+      alert("Couldn't send the report — try again in a bit.");
     });
   });
 
@@ -1041,6 +1045,7 @@
     currentFranchiseDetail = null;
     currentFranchiseCharDetail = null;
     currentFranchiseAllDetail = null;
+    currentFranchiseGeneralDetail = null;
     if (!lyricsLoaded) loadLyrics(); else loadArtistsData();
     if (lyricsBrowseMode === 'franchise' && !franchisesLoaded) loadFranchiseBrowse();
   }
@@ -1053,6 +1058,7 @@
     currentFranchiseDetail = null;
     currentFranchiseCharDetail = null;
     currentFranchiseAllDetail = null;
+    currentFranchiseGeneralDetail = null;
     artistDetailSortDir = 'asc';
     artistDetailSearchQuery = '';
     if (!lyricsLoaded) {
@@ -1067,6 +1073,23 @@
       });
     } else {
       renderArtistDetail(name);
+    }
+
+    // NEW: background-load franchise/character metadata (for AKA-aware
+    // tag search below) if not already cached. Non-blocking — the page
+    // renders immediately with whatever it already has, and if the
+    // person is mid-search when this resolves, it just re-filters.
+    if (!franchisesLoaded) {
+      api('franchises').then(function (list) {
+        allFranchises = list || []; franchisesLoaded = true;
+        if (currentArtistDetail === name && artistDetailSearchQuery) renderArtistDetail(name);
+      }).catch(function () { franchisesLoaded = true; });
+    }
+    if (!charactersLoaded) {
+      api('characters').then(function (list) {
+        allCharacters = list || []; charactersLoaded = true;
+        if (currentArtistDetail === name && artistDetailSearchQuery) renderArtistDetail(name);
+      }).catch(function () { charactersLoaded = true; });
     }
   }
   function showLyricsDetail(id) {
@@ -1181,12 +1204,13 @@
     if (path === 'lyrics') { showLyricsList(); return; }
     if (path.indexOf('artist-') === 0) { showArtistDetail(decodeURIComponent(path.slice(7))); return; }
     if (path.indexOf('lyric-') === 0) { showLyricsDetail(path.slice(6)); return; }
-    // NEW: franchise/<name>  |  franchise/<name>/all  |  franchise/<name>/char/<character>
+    // NEW: franchise/<name>  |  franchise/<name>/all  |  franchise/<name>/general  |  franchise/<name>/char/<character>
     if (path.indexOf('franchise/') === 0) {
       var rest = path.slice('franchise/'.length);
       var segs = rest.split('/');
       if (segs.length === 1 && segs[0]) { showFranchiseDetail(decodeURIComponent(segs[0])); return; }
       if (segs.length === 2 && segs[1] === 'all') { showFranchiseAllSongs(decodeURIComponent(segs[0])); return; }
+      if (segs.length === 2 && segs[1] === 'general') { showFranchiseGeneralSongs(decodeURIComponent(segs[0])); return; }
       if (segs.length === 3 && segs[1] === 'char') { showFranchiseCharacterDetail(decodeURIComponent(segs[0]), decodeURIComponent(segs[2])); return; }
     }
     if (path === 'encyclopedia') { showEncyclopedia(); return; }
@@ -1509,6 +1533,16 @@
     });
   }
 
+  // True if `q` (already lowercased) matches `name` itself, or any of
+  // `meta`'s comma-separated AKA/alternate names — so a search for "ZZZ"
+  // finds a franchise/character whose canonical name is "Zenless Zone
+  // Zero" but has "ZZZ" listed in its AKA column.
+  function akaMatches_(name, meta, q) {
+    if (String(name || '').toLowerCase().indexOf(q) !== -1) return true;
+    if (!meta || !meta.aka) return false;
+    return splitCsv_(meta.aka).some(function (a) { return a.toLowerCase().indexOf(q) !== -1; });
+  }
+
   function uniqueFranchiseList() {
     var metaMap = {};
     var hiddenMap = {};
@@ -1531,7 +1565,7 @@
       });
     });
     var q = franchiseSearchQuery.trim().toLowerCase();
-    if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
+    if (q) names = names.filter(function (n) { return akaMatches_(n, metaMap[normalizeArtistKey(n)], q); });
     names.sort(function (a, b) {
       return franchiseSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     });
@@ -1671,7 +1705,7 @@
       });
     });
     var q = franchiseCharSearchQuery.trim().toLowerCase();
-    if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
+    if (q) names = names.filter(function (n) { return akaMatches_(n, lookupMeta(normalizeArtistKey(n)), q); });
     names.sort(function (a, b) {
       return franchiseCharSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     });
@@ -1689,6 +1723,7 @@
     currentFranchiseDetail = name;
     currentFranchiseCharDetail = null;
     currentFranchiseAllDetail = null;
+    currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
     franchiseCharSortDir = 'asc';
     franchiseCharSearchQuery = '';
@@ -1735,6 +1770,21 @@
         '</div>' +
       '</div>';
 
+    // NEW: a separate tile for songs tagged with this franchise but with
+    // no specific character (e.g. a song that's just generally about
+    // Marvel, not tied to one hero) — only shown when at least one such
+    // song exists, so franchises where every song names a character
+    // don't get an empty/pointless tile.
+    var generalSongs = songs.filter(function (item) { return isNA(item.character); });
+    var generalTile = generalSongs.length
+      ? '<div class="lyric-card" id="franchise-general-songs-tile" style="margin-bottom:22px;">' +
+          '<div class="lyric-body" style="padding:18px;">' +
+            '<p class="lyric-title">&#9654; GENERAL / NO SPECIFIC CHARACTER</p>' +
+            '<p class="lyric-artist">' + generalSongs.length + (generalSongs.length === 1 ? ' song' : ' songs') + ' not tied to a specific character</p>' +
+          '</div>' +
+        '</div>'
+      : '';
+
     var characters = uniqueCharactersForFranchise_(name);
 
     var toolbarRow =
@@ -1758,11 +1808,18 @@
       }).join('') + '</div>';
     }
 
-    container.innerHTML = header + allSongsTile + toolbarRow + gridHtml;
+    container.innerHTML = header + allSongsTile + generalTile + toolbarRow + gridHtml;
 
     document.getElementById('franchise-all-songs-tile').addEventListener('click', function () {
       showFranchiseAllSongs(name);
     });
+
+    var generalTileEl = document.getElementById('franchise-general-songs-tile');
+    if (generalTileEl) {
+      generalTileEl.addEventListener('click', function () {
+        showFranchiseGeneralSongs(name);
+      });
+    }
 
     container.querySelectorAll('[data-character]').forEach(function (card) {
       card.addEventListener('click', function () {
@@ -1796,8 +1853,11 @@
     setPath('franchise/' + encodeURIComponent(franchise) + '/char/' + encodeURIComponent(character));
     currentFranchiseCharDetail = { franchise: franchise, character: character };
     currentFranchiseAllDetail = null;
+    currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
     franchiseSongsSortDir = 'asc';
+    franchiseSongsSortField = 'song';
+    franchiseSongsArtistSecondaryDir = 'asc';
     franchiseSongsSearchQuery = '';
 
     function render() {
@@ -1839,8 +1899,11 @@
     setPath('franchise/' + encodeURIComponent(franchise) + '/all');
     currentFranchiseAllDetail = franchise;
     currentFranchiseCharDetail = null;
+    currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
     franchiseSongsSortDir = 'asc';
+    franchiseSongsSortField = 'song';
+    franchiseSongsArtistSecondaryDir = 'asc';
     franchiseSongsSearchQuery = '';
 
     function render() {
@@ -1867,19 +1930,79 @@
     }
   }
 
+  // NEW: shows songs tagged with a franchise but with NO character tag
+  // at all — e.g. a song that's just generally about Marvel rather than
+  // one specific hero.
+  function showFranchiseGeneralSongs(franchise) {
+    hideAllViews();
+    document.getElementById('view-franchise-songs').style.display = '';
+    setActiveTab('lyrics');
+    setPath('franchise/' + encodeURIComponent(franchise) + '/general');
+    currentFranchiseGeneralDetail = franchise;
+    currentFranchiseAllDetail = null;
+    currentFranchiseCharDetail = null;
+    currentArtistDetail = null;
+    franchiseSongsSortDir = 'asc';
+    franchiseSongsSortField = 'song';
+    franchiseSongsArtistSecondaryDir = 'asc';
+    franchiseSongsSearchQuery = '';
+
+    function render() {
+      var meta = allFranchises.filter(function (f) { return normalizeArtistKey(f.franchise) === normalizeArtistKey(franchise); })[0] || {};
+      var generalSongs = franchiseSongs_(franchise).filter(function (item) { return isNA(item.character); });
+      renderFranchiseSongsPage_(franchise, 'General \u2014 no specific character', generalSongs, meta.image || '');
+    }
+
+    var needLyrics = !lyricsLoaded;
+    var needFranchises = !franchisesLoaded;
+    if (needLyrics || needFranchises) {
+      document.getElementById('franchise-songs-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
+      var lyricsPromise = needLyrics ? api('lyrics') : Promise.resolve(allLyrics);
+      var franPromise = needFranchises ? api('franchises').catch(function () { return []; }) : Promise.resolve(allFranchises);
+      Promise.all([lyricsPromise, franPromise]).then(function (r) {
+        if (needLyrics) { allLyrics = r[0] || []; lyricsLoaded = true; }
+        if (needFranchises) { allFranchises = r[1] || []; franchisesLoaded = true; }
+        render();
+      }).catch(function (err) {
+        renderErrorWithRetry(document.getElementById('franchise-songs-content'),
+          "Couldn't load songs: " + escapeHtml(err.message || err), function () { showFranchiseGeneralSongs(franchise); });
+      });
+    } else {
+      render();
+    }
+  }
+
   // Shared renderer for both "a character's songs" and "all songs in a
   // franchise" — same look as an artist's song list, with its own
-  // search box + A-Z/Z-A sort. heroImage (optional) shows the
+  // search box, a SORT BY toggle (Song title vs Artist name), a
+  // direction toggle for whichever field is primary, and — only when
+  // sorting by Artist — a second toggle for which direction songs within
+  // each artist are ordered in. heroImage (optional) shows the
   // character's/franchise's picture in the hero banner, same spot the
   // artist detail page uses.
+  function sortFranchiseSongsList_(list) {
+    var sorted = list.slice();
+    if (franchiseSongsSortField === 'artist') {
+      sorted.sort(function (a, b) {
+        var artCmp = String(a.artist || '').localeCompare(String(b.artist || ''));
+        if (artCmp !== 0) return franchiseSongsSortDir === 'asc' ? artCmp : -artCmp;
+        var titleCmp = String(a.title || '').localeCompare(String(b.title || ''));
+        return franchiseSongsArtistSecondaryDir === 'asc' ? titleCmp : -titleCmp;
+      });
+    } else {
+      sorted.sort(function (a, b) {
+        var cmp = String(a.title || '').localeCompare(String(b.title || ''));
+        return franchiseSongsSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return sorted;
+  }
+
   function renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage) {
     var container = document.getElementById('franchise-songs-content');
     var fallback = getFallbackImage();
 
-    var sorted = songsForPage.slice().sort(function (a, b) {
-      var cmp = String(a.title || '').localeCompare(String(b.title || ''));
-      return franchiseSongsSortDir === 'asc' ? cmp : -cmp;
-    });
+    var sorted = sortFranchiseSongsList_(songsForPage);
 
     var imgHtml = heroImage
       ? '<img class="detail-hero-img" src="' + escapeHtml(optimizeArtUrl(heroImage, 440)) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">'
@@ -1902,10 +2025,22 @@
     var q = franchiseSongsSearchQuery.trim().toLowerCase();
     var songs = q ? sorted.filter(function (s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; }) : sorted;
 
+    var fieldLabel = franchiseSongsSortField === 'artist' ? 'ARTIST' : 'SONG';
+    var dirFirst = franchiseSongsSortDir === 'asc' ? 'A' : 'Z';
+    var dirSecond = franchiseSongsSortDir === 'asc' ? 'Z' : 'A';
+    var secondaryFirst = franchiseSongsArtistSecondaryDir === 'asc' ? 'A' : 'Z';
+    var secondarySecond = franchiseSongsArtistSecondaryDir === 'asc' ? 'Z' : 'A';
+
     var toolbarRow =
       '<div class="artist-detail-toolbar">' +
         '<input type="text" class="search-box artist-detail-search" id="franchise-songs-search" placeholder="Search songs&hellip;" value="' + escapeHtml(franchiseSongsSearchQuery) + '">' +
-        '<div class="nav-tab" id="franchise-songs-sort-toggle">SORT: ' + (franchiseSongsSortDir === 'asc' ? 'A<span class="sort-arrow">&#8594;</span>Z' : 'Z<span class="sort-arrow">&#8594;</span>A') + '</div>' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+          '<div class="nav-tab" id="franchise-songs-sortfield-toggle">SORT BY: ' + fieldLabel + '</div>' +
+          '<div class="nav-tab" id="franchise-songs-sortdir-toggle">' + dirFirst + '<span class="sort-arrow">&#8594;</span>' + dirSecond + '</div>' +
+          (franchiseSongsSortField === 'artist'
+            ? '<div class="nav-tab" id="franchise-songs-secondary-toggle">SONGS: ' + secondaryFirst + '<span class="sort-arrow">&#8594;</span>' + secondarySecond + '</div>'
+            : '') +
+        '</div>' +
       '</div>';
 
     var cardsHtml = !songs.length ? '<div class="empty">No songs match your search.</div>' : songs.map(function (item) {
@@ -1927,10 +2062,27 @@
 
     container.innerHTML = header + toolbarRow + cardsHtml;
 
-    var sortToggle = document.getElementById('franchise-songs-sort-toggle');
-    if (sortToggle) {
-      sortToggle.addEventListener('click', function () {
+    var sortFieldToggle = document.getElementById('franchise-songs-sortfield-toggle');
+    if (sortFieldToggle) {
+      sortFieldToggle.addEventListener('click', function () {
+        franchiseSongsSortField = franchiseSongsSortField === 'song' ? 'artist' : 'song';
+        franchiseSongsSortDir = 'asc'; // reset direction when switching what's being sorted
+        renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
+      });
+    }
+
+    var sortDirToggle = document.getElementById('franchise-songs-sortdir-toggle');
+    if (sortDirToggle) {
+      sortDirToggle.addEventListener('click', function () {
         franchiseSongsSortDir = franchiseSongsSortDir === 'asc' ? 'desc' : 'asc';
+        renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
+      });
+    }
+
+    var secondaryToggle = document.getElementById('franchise-songs-secondary-toggle');
+    if (secondaryToggle) {
+      secondaryToggle.addEventListener('click', function () {
+        franchiseSongsArtistSecondaryDir = franchiseSongsArtistSecondaryDir === 'asc' ? 'desc' : 'asc';
         renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
       });
     }
@@ -1956,9 +2108,27 @@
 
   document.getElementById('franchise-songs-back').addEventListener('click', function () {
     if (currentFranchiseCharDetail) showFranchiseDetail(currentFranchiseCharDetail.franchise);
+    else if (currentFranchiseGeneralDetail) showFranchiseDetail(currentFranchiseGeneralDetail);
     else if (currentFranchiseAllDetail) showFranchiseDetail(currentFranchiseAllDetail);
     else showLyricsList();
   });
+
+  // Checks whether a song's Franchise/Character tags (or their AKAs)
+  // match a search query — lets a search on an artist's song list also
+  // find songs by the game/show/character they're tagged with, not just
+  // the song title.
+  function songTagsMatchQuery_(item, q) {
+    function checkCsv(rawCsv, isCharacter) {
+      if (isNA(rawCsv)) return false;
+      return splitCsv_(rawCsv).some(function (part) {
+        var meta = isCharacter
+          ? findCharacterMeta_(!isNA(item.franchise) ? splitCsv_(item.franchise)[0] : '', part)
+          : (allFranchises.filter(function (f) { return normalizeArtistKey(f.franchise) === normalizeArtistKey(part); })[0] || null);
+        return akaMatches_(part, meta, q);
+      });
+    }
+    return checkCsv(item.franchise, false) || checkCsv(item.character, true);
+  }
 
   // ARTIST DETAIL — songs by one artist, with a search box + sort toggle.
   function renderArtistDetail(name) {
@@ -1995,13 +2165,15 @@
     }
 
     var q = artistDetailSearchQuery.trim().toLowerCase();
-    var songs = q ? allSongs.filter(function (s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; }) : allSongs;
+    var songs = q ? allSongs.filter(function (s) {
+      return String(s.title || '').toLowerCase().indexOf(q) !== -1 || songTagsMatchQuery_(s, q);
+    }) : allSongs;
 
     var sortFirst = artistDetailSortDir === 'asc' ? 'A' : 'Z';
     var sortSecond = artistDetailSortDir === 'asc' ? 'Z' : 'A';
     var toolbarRow =
       '<div class="artist-detail-toolbar">' +
-        '<input type="text" class="search-box artist-detail-search" id="artist-detail-search" placeholder="Search songs&hellip;" value="' + escapeHtml(artistDetailSearchQuery) + '">' +
+        '<input type="text" class="search-box artist-detail-search" id="artist-detail-search" placeholder="Search songs or tags&hellip;" value="' + escapeHtml(artistDetailSearchQuery) + '">' +
         '<div class="nav-tab" id="artist-detail-sort-toggle">SORT: ' + sortFirst + '<span class="sort-arrow">&#8594;</span>' + sortSecond + '</div>' +
       '</div>';
 
@@ -2062,6 +2234,7 @@
 
   document.getElementById('lyric-detail-back').addEventListener('click', function () {
     if (currentFranchiseCharDetail) showFranchiseCharacterDetail(currentFranchiseCharDetail.franchise, currentFranchiseCharDetail.character);
+    else if (currentFranchiseGeneralDetail) showFranchiseGeneralSongs(currentFranchiseGeneralDetail);
     else if (currentFranchiseAllDetail) showFranchiseAllSongs(currentFranchiseAllDetail);
     else if (currentArtistDetail) showArtistDetail(currentArtistDetail);
     else showLyricsList();
