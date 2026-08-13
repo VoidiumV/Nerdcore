@@ -6,9 +6,6 @@
 <title>Nerdcore Archive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- PERF: preconnect to the CDNs actual artwork/cover URLs come from, so
-     the browser has the connection (DNS+TLS) ready before it ever parses
-     the <img> tags that need them, instead of paying that latency per-image. -->
 <link rel="preconnect" href="https://is1-ssl.mzstatic.com" crossorigin>
 <link rel="preconnect" href="https://is2-ssl.mzstatic.com" crossorigin>
 <link rel="preconnect" href="https://is3-ssl.mzstatic.com" crossorigin>
@@ -146,10 +143,6 @@
   .home-tile h3{ font-family:'Press Start 2P', monospace; font-size:14px; color:var(--ink); margin:0 0 8px; line-height:1.5; }
   .home-tile p{ font-size:16px; color:var(--muted); margin:0; line-height:1.5; }
   @media(max-width:600px){ .home-grid{ grid-template-columns:1fr; } }
-  /* About Me is always the last tile. When the total number of tiles is
-     odd, it's alone in the final row, so let it span the full row width
-     instead of sitting half-empty next to nothing. When the count is
-     even it lines up normally with everything else. */
   .home-tile:last-child:nth-child(odd){ grid-column:1 / -1; }
 
   .home-social-section{ margin-top:28px; }
@@ -196,8 +189,6 @@
     background:var(--panel); border:3px solid var(--border);
     box-shadow:6px 6px 0 rgba(0,0,0,0.35); margin-bottom:24px; overflow:hidden;
   }
-  /* Report-an-issue button, now a small corner flag on the lyric's hero
-     card instead of a full-width row at the very bottom of the page. */
   .report-btn-corner{
     position:absolute; top:10px; right:10px; z-index:2;
     font-family:'VT323', monospace; font-size:14px;
@@ -282,14 +273,10 @@
   .artist-card:hover{ transform:translate(-3px,-3px); box-shadow:8px 8px 0 rgba(0,0,0,0.4); border-color:var(--green); }
   .artist-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; background:#0a0d1c; border-bottom:3px solid var(--border); display:block; }
   .artist-card .name{ font-family:'Press Start 2P', monospace; font-size:12px; color:var(--green); padding:12px 10px; text-align:center; line-height:1.6; }
-  /* NEW: small category tag under a franchise tile's name (e.g. "VIDEO
-     GAME" / "ANIME" / "SUPERHERO"), sourced from the optional Franchises
-     tab's "Category" column. */
   .franchise-cat{ font-family:'VT323', monospace; font-size:13px; color:var(--amber); text-align:center; padding:0 10px 12px; letter-spacing:0.5px; }
   .sort-arrow{ font-family:'VT323', monospace; font-size:20px; line-height:1; vertical-align:middle; padding:0 2px; position:relative; top:-3px; }
 
-  /* ---------- artist detail toolbar (search + sort) — reused by
-       franchise/character song lists too ---------- */
+  /* ---------- artist detail toolbar (search + sort) ---------- */
   .artist-detail-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
   .artist-detail-search{ flex:1; min-width:180px; }
 
@@ -330,20 +317,12 @@
   .release-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px; }
   .release-card{ position:relative; background:var(--panel); border:2px solid var(--border); padding:10px 12px; display:flex; gap:10px; align-items:flex-start; box-shadow:3px 3px 0 rgba(0,0,0,0.3); }
   .release-info{ min-width:0; flex:1; }
-  /* Album/EP badge now sits as a small corner tag instead of its own row
-     at the bottom of the card, so it no longer grows the card's height. */
   .release-type-badge{
     position:absolute; top:8px; right:8px;
     font-size:11px; padding:2px 6px;
   }
-  /* FIX: long titles/artists were being clipped with an ellipsis. Now the
-     text wraps onto extra lines instead of being cut off, at full size. */
   .release-song{ font-family:'VT323', monospace; font-size:17px; color:var(--ink); white-space:normal; overflow-wrap:break-word; word-break:break-word; display:block; line-height:1.3; }
   .release-artist{ font-family:'VT323', monospace; font-size:15px; color:var(--muted); white-space:normal; overflow-wrap:break-word; word-break:break-word; line-height:1.3; }
-  /* FIX: a linked song used to look identical to plain text until you
-     hovered over it, so it wasn't obvious anything was clickable. Songs
-     with a link now always show in green with a permanent underline and
-     a small play icon, instead of that only appearing on hover. */
   .release-song-link{ cursor:pointer; text-decoration:none; }
   .release-song-link.has-link{ color:var(--green); text-decoration:underline; text-underline-offset:3px; }
   .release-song-link.has-link:hover{ color:var(--amber); }
@@ -431,7 +410,7 @@
   .flip-fallback{ text-align:center; font-family:'VT323', monospace; font-size:18px; color:var(--muted); padding:40px 20px; max-width:500px; }
   .flip-fallback a{ color:var(--green); text-decoration:underline; }
 
-  /* ---------- encyclopedia "digital book" page viewer ---------- */
+  /* ---------- encyclopedia page viewer ---------- */
   .enc-book{
     position:relative;
     width:100%; max-width:760px;
@@ -825,25 +804,11 @@
     return (siteSettings && siteSettings.defaultImage) || 'https://placehold.co/220x220/141831/3dff8f?text=%3F';
   }
 
-  // Splits a comma-separated tag cell (Franchise / Character columns)
-  // into trimmed, non-empty parts. Deliberately comma-only (unlike
-  // splitArtistNames below) since franchise/character names can
-  // legitimately contain "&" (e.g. "Cloak & Dagger").
   function splitCsv_(raw) {
     if (!raw) return [];
     return String(raw).split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
   }
 
-  // PERF: the backend's artwork autofill always stores Apple/iTunes cover
-  // art at a fixed 1200x1200 (good for the detail-page hero, way more
-  // than a 120px grid thumbnail needs). Apple's CDN happily serves any
-  // WxH baked into the filename, so this swaps in the actual pixel size
-  // needed for wherever the image is being displayed — a small artist
-  // grid tile downloads a small file instead of the same 1200x1200 master
-  // every other context uses. `size` should be roughly 2x the CSS pixel
-  // size, for retina screens without over-fetching. Only touches Apple's
-  // CDN URLs; anything else (Genius, Drive, a custom link) passes through
-  // unchanged since those don't support this kind of resizing.
   function optimizeArtUrl(url, size) {
     if (!url) return url;
     var str = String(url);
@@ -980,7 +945,7 @@
     }
   })();
 
-  // RESIZABLE SCRIPT — drag the corner grip to resize the player
+  // RESIZABLE SCRIPT
   (function makeResizable() {
     var player = document.getElementById('floating-player');
     var handle = document.getElementById('floating-player-resize-handle');
@@ -1075,10 +1040,6 @@
       renderArtistDetail(name);
     }
 
-    // NEW: background-load franchise/character metadata (for AKA-aware
-    // tag search below) if not already cached. Non-blocking — the page
-    // renders immediately with whatever it already has, and if the
-    // person is mid-search when this resolves, it just re-filters.
     if (!franchisesLoaded) {
       api('franchises').then(function (list) {
         allFranchises = list || []; franchisesLoaded = true;
@@ -1144,7 +1105,7 @@
     api('disclaimers').then(function (d) {
       siteDisclaimers = d || {};
       renderAllDisclaimers();
-    }).catch(function () { }); // non-fatal — pages just show no banner
+    }).catch(function () { }); 
   }
 
   function renderAllDisclaimers() {
@@ -1204,7 +1165,6 @@
     if (path === 'lyrics') { showLyricsList(); return; }
     if (path.indexOf('artist-') === 0) { showArtistDetail(decodeURIComponent(path.slice(7))); return; }
     if (path.indexOf('lyric-') === 0) { showLyricsDetail(path.slice(6)); return; }
-    // NEW: franchise/<name>  |  franchise/<name>/all  |  franchise/<name>/general  |  franchise/<name>/char/<character>
     if (path.indexOf('franchise/') === 0) {
       var rest = path.slice('franchise/'.length);
       var segs = rest.split('/');
@@ -1243,7 +1203,6 @@
     });
   });
 
-  // NEW: "BY ARTIST" / "BY FRANCHISE" browse-mode subtabs on the Lyrics page
   document.querySelectorAll('#lyrics-browse-tabs .subtab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       var mode = tab.getAttribute('data-browsemode');
@@ -1367,37 +1326,16 @@
     }).catch(function () { });
   }
 
-  // LYRICS = ARTIST PROFILES
-  // FIX: "," and "&" now split with OPTIONAL whitespace on either side
-  // (e.g. "A &B", "A& B", "A,B" all split correctly now, not just "A & B"
-  // / "A, B"). Previously a missing space around the separator meant the
-  // whole credit stayed glued together as one string, which never matched
-  // any entry on the Artists tab (including a hidden one) by name, so a
-  // hidden artist's split-off name could end up back on the grid as part
-  // of an unrecognized combined string instead of being filtered out.
   function splitArtistNames(raw) {
     if (!raw) return [];
     var parts = String(raw).split(/\s*,\s*|\s*&\s*|\s+x\s+|\s+vs\.?\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+with\s+/i);
     return parts.map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
   }
 
-  // Normalizes a name into a stable lookup key: trims, collapses any run
-  // of whitespace (including stray double-spaces or non-breaking spaces
-  // that sometimes creep in from copy/pasting) down to a single space,
-  // and lowercases. Used everywhere a name from the Lyrics sheet needs to
-  // be matched against a name on the Artists/Franchises/Characters sheet
-  // (e.g. to find its image or its "Is Hidden" flag), so small formatting
-  // differences between sheets don't cause a false non-match. Despite the
-  // name, this is used generically for artists, franchises, AND
-  // characters alike.
   function normalizeArtistKey(name) {
     return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
-  // PERF: was api('lyrics').then(...) -> THEN starts api('artists') only
-  // after lyrics finishes — two sequential round trips on first visit to
-  // the Lyrics tab. Firing both requests together and waiting on whichever
-  // finishes last cuts that latency roughly in half.
   function loadLyrics() {
     var lyricsPromise = api('lyrics');
     var artistsPromise = artistsLoaded ? Promise.resolve(null) : api('artists').catch(function () { return null; });
@@ -1409,7 +1347,7 @@
     }).then(function (artistList) {
       if (!artistsLoaded) {
         artistsLoaded = true;
-        allArtists = artistList || []; // non-fatal if this came back empty/null — grid still works, just without photos
+        allArtists = artistList || []; 
       }
       renderArtistGrid();
     }).catch(function (err) {
@@ -1425,16 +1363,12 @@
       allArtists = list || [];
       renderArtistGrid();
     }).catch(function () {
-      // Non-fatal — the grid still works from the lyrics data alone, just without photos.
       artistsLoaded = true;
       allArtists = [];
       renderArtistGrid();
     });
   }
 
-  // Builds the unique, de-duplicated artist list — splitting combined
-  // credits like "Daddyphatsnaps & OmarCameUp" into separate artists so
-  // each one gets their own profile (and no joint "A & B" profile is ever created).
   function uniqueArtistList() {
     var pfpMap = {};
     var hiddenMap = {};
@@ -1452,10 +1386,6 @@
         var key = normalizeArtistKey(name);
         if (seen[key]) return;
         seen[key] = true;
-        // Hidden artists (Is Hidden = TRUE on the Artists tab) don't get
-        // their own profile card here — but this only skips adding
-        // *this* name to the grid; their songs still appear normally on
-        // any co-credited artist's page.
         if (hiddenMap[key]) return;
         names.push(name);
       });
@@ -1490,9 +1420,6 @@
     });
   }
 
-  // PERF: tiny debounce so fast typing doesn't force a full grid re-render
-  // on every single keystroke — still feels instant at 120ms, just skips
-  // the redundant in-between renders.
   function debounce_(fn, waitMs) {
     var t;
     return function () {
@@ -1533,10 +1460,6 @@
     });
   }
 
-  // True if `q` (already lowercased) matches `name` itself, or any of
-  // `meta`'s comma-separated AKA/alternate names — so a search for "ZZZ"
-  // finds a franchise/character whose canonical name is "Zenless Zone
-  // Zero" but has "ZZZ" listed in its AKA column.
   function akaMatches_(name, meta, q) {
     if (String(name || '').toLowerCase().indexOf(q) !== -1) return true;
     if (!meta || !meta.aka) return false;
@@ -1612,9 +1535,6 @@
     renderFranchiseGrid();
   });
 
-  // Validates/normalizes a hex color string (e.g. "ffb627" or
-  // "#FFB627") into a proper "#RRGGBB"/"#RGB" form, or '' if it isn't a
-  // usable hex color (e.g. left blank on the Characters sheet).
   function normalizeHexColor_(hex) {
     var h = String(hex || '').trim();
     if (!h) return '';
@@ -1622,14 +1542,6 @@
     return /^#[0-9a-fA-F]{3}$|^#[0-9a-fA-F]{6}$/.test(h) ? h : '';
   }
 
-  // Finds the best-matching Characters-tab row for a given
-  // franchise+character pair: an exact franchise+character match first,
-  // falling back to a character row that was left with no Franchise
-  // value at all (a franchise-agnostic entry). Same "same name, two
-  // different franchises get two different images/colors" logic used by
-  // uniqueCharactersForFranchise_ below, just as a standalone lookup for
-  // a single character (used on the character's song list page and on
-  // the song detail page's character tag badges).
   function findCharacterMeta_(franchise, character) {
     var fKey = normalizeArtistKey(franchise);
     var ck = normalizeArtistKey(character);
@@ -1650,15 +1562,6 @@
     });
   }
 
-  // FIX: the same character name (e.g. "Jinx") can legitimately appear
-  // MORE THAN ONCE on the Characters tab — once per franchise, each with
-  // its own Image URL (Jinx-in-Arcane vs Jinx-in-League-of-Legends).
-  // Keying purely by character name meant whichever row loaded last
-  // silently won for every franchise. This now keys primarily by
-  // "franchise|character" so each franchise's row for that character
-  // resolves to ITS OWN image/hidden flag, and only falls back to a
-  // name-only match for a Characters row that was left with no
-  // Franchise value at all (a genuinely franchise-agnostic entry).
   function uniqueCharactersForFranchise_(name) {
     var fKey = normalizeArtistKey(name);
     var metaByCombo = {};
@@ -1684,10 +1587,6 @@
     }
     function isHiddenFor(ck) {
       if (hiddenCombo[fKey + '|' + ck]) return true;
-      // Only fall back to a name-only "Is Hidden" if there's no
-      // franchise-specific row for this character+franchise at all —
-      // otherwise a hidden Jinx-in-League-of-Legends row would wrongly
-      // hide the (separately un-hidden) Jinx-in-Arcane row too.
       if (!metaByCombo[fKey + '|' + ck] && hiddenNameOnly[ck]) return true;
       return false;
     }
@@ -1770,11 +1669,6 @@
         '</div>' +
       '</div>';
 
-    // NEW: a separate tile for songs tagged with this franchise but with
-    // no specific character (e.g. a song that's just generally about
-    // Marvel, not tied to one hero) — only shown when at least one such
-    // song exists, so franchises where every song names a character
-    // don't get an empty/pointless tile.
     var generalSongs = songs.filter(function (item) { return isNA(item.character); });
     var generalTile = generalSongs.length
       ? '<div class="lyric-card" id="franchise-general-songs-tile" style="margin-bottom:22px;">' +
@@ -1867,8 +1761,6 @@
           splitCsv_(item.franchise).some(function (f) { return normalizeArtistKey(f) === fKey; }) &&
           splitCsv_(item.character).some(function (c) { return normalizeArtistKey(c) === cKey; });
       });
-      // NEW: show the character's own image (franchise-specific, via
-      // findCharacterMeta_) as the hero image on their song list page.
       var meta = findCharacterMeta_(franchise, character) || {};
       renderFranchiseSongsPage_(character, franchise, songs, meta.image || '');
     }
@@ -1930,9 +1822,6 @@
     }
   }
 
-  // NEW: shows songs tagged with a franchise but with NO character tag
-  // at all — e.g. a song that's just generally about Marvel rather than
-  // one specific hero.
   function showFranchiseGeneralSongs(franchise) {
     hideAllViews();
     document.getElementById('view-franchise-songs').style.display = '';
@@ -1972,14 +1861,6 @@
     }
   }
 
-  // Shared renderer for both "a character's songs" and "all songs in a
-  // franchise" — same look as an artist's song list, with its own
-  // search box, a SORT BY toggle (Song title vs Artist name), a
-  // direction toggle for whichever field is primary, and — only when
-  // sorting by Artist — a second toggle for which direction songs within
-  // each artist are ordered in. heroImage (optional) shows the
-  // character's/franchise's picture in the hero banner, same spot the
-  // artist detail page uses.
   function sortFranchiseSongsList_(list) {
     var sorted = list.slice();
     if (franchiseSongsSortField === 'artist') {
@@ -2113,10 +1994,6 @@
     else showLyricsList();
   });
 
-  // Checks whether a song's Franchise/Character tags (or their AKAs)
-  // match a search query — lets a search on an artist's song list also
-  // find songs by the game/show/character they're tagged with, not just
-  // the song title.
   function songTagsMatchQuery_(item, q) {
     function checkCsv(rawCsv, isCharacter) {
       if (isNA(rawCsv)) return false;
@@ -2130,7 +2007,7 @@
     return checkCsv(item.franchise, false) || checkCsv(item.character, true);
   }
 
-  // ARTIST DETAIL — songs by one artist, with a search box + sort toggle.
+  // ARTIST DETAIL
   function renderArtistDetail(name) {
     var container = document.getElementById('artist-detail-content');
     var pfpEntry = allArtists.filter(function (a) {
@@ -2242,9 +2119,6 @@
 
   function loadLyricDetail(id) {
     var lyricPromise = api('lyric', { id: id });
-    // Also fetch franchise + character metadata (for custom tag colors
-    // on this page) if not already cached — done in parallel so it
-    // doesn't add an extra sequential round trip.
     var franPromise = franchisesLoaded ? Promise.resolve(allFranchises) : api('franchises').catch(function () { return []; });
     var charsPromise = charactersLoaded ? Promise.resolve(allCharacters) : api('characters').catch(function () { return []; });
     Promise.all([lyricPromise, franPromise, charsPromise]).then(function (r) {
@@ -2257,10 +2131,6 @@
     });
   }
 
-  // Converts a regular open.spotify.com share link into Spotify's
-  // embeddable player URL (https://open.spotify.com/embed/track/ID),
-  // so it can play inline in the floating player instead of redirecting
-  // off-site. Returns '' if the URL isn't a recognizable Spotify link.
   function toSpotifyEmbedUrl(url) {
     if (!url) return '';
     var m = String(url).match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist|episode|show)\/([A-Za-z0-9]+)/i);
@@ -2268,9 +2138,6 @@
     return 'https://open.spotify.com/embed/' + m[1] + '/' + m[2];
   }
 
-  // Converts a regular music.apple.com share link into Apple Music's
-  // embeddable player URL (just swaps in the "embed." subdomain) so it
-  // can play inline instead of redirecting off-site.
   function toAppleMusicEmbedUrl(url) {
     if (!url) return '';
     return String(url).replace(/^https?:\/\/music\.apple\.com/i, 'https://embed.music.apple.com');
@@ -2284,10 +2151,6 @@
     var fallback = getFallbackImage();
     var img = post.cover ? optimizeArtUrl(post.cover, 440) : fallback;
 
-    // Spotify and Apple Music now open inline in the same floating
-    // player used for YouTube, instead of redirecting off-site. Falls
-    // back to a normal external link if the URL doesn't match the
-    // expected share-link format (embed conversion failed).
     var streamBtns = '';
     if (post.spotify) {
       var spotifyEmbed = toSpotifyEmbedUrl(post.spotify);
@@ -2303,18 +2166,12 @@
     }
     if (post.youtube) streamBtns += '<button class="stream-btn youtube" onclick="openFloatingPlayer(\'' + escapeHtml(post.youtube) + '\')">&#9654; Watch Video</button>';
 
-    // NEW: franchise/character tag badges — clicking one jumps straight
-    // into that franchise/character's browse view.
     var tagsHtml = '';
     if (!isNA(post.franchise) || !isNA(post.character)) {
       var firstFranchise = !isNA(post.franchise) ? splitCsv_(post.franchise)[0] : '';
       var tagBits = [];
       if (!isNA(post.franchise)) {
         splitCsv_(post.franchise).forEach(function (f) {
-          // NEW: if this franchise has a custom "Color" set on the
-          // Franchises tab, use it for the badge instead of the default
-          // blue "ep" badge styling. Leave the Color cell blank to keep
-          // the default look.
           var fMeta = allFranchises.filter(function (x) { return normalizeArtistKey(x.franchise) === normalizeArtistKey(f); })[0] || {};
           var fColor = normalizeHexColor_(fMeta.color);
           var fClassAttr = fColor ? 'badge' : 'badge ep';
@@ -2326,11 +2183,6 @@
       }
       if (!isNA(post.character)) {
         splitCsv_(post.character).forEach(function (c) {
-          // NEW: if this character has a custom "Color" set on the
-          // Characters tab (for this franchise, or a franchise-agnostic
-          // row), use it for the badge instead of the default magenta
-          // "album" badge styling. Leave the Color cell blank to keep
-          // the default look.
           var meta = findCharacterMeta_(firstFranchise, c) || {};
           var customColor = normalizeHexColor_(meta.color);
           var classAttr = customColor ? 'badge' : 'badge album';
@@ -2410,12 +2262,8 @@
         var songHtml;
         var linkIcon = '<span class="release-link-ico">&#9654;</span>';
         if (item.youtube) {
-          // Prefer YouTube — embeds inline in the floating player, same as Top 5.
           songHtml = '<a class="release-song release-song-link has-link" href="javascript:void(0)" onclick="openFloatingPlayer(\'' + escapeHtml(item.youtube) + '\')">' + linkIcon + titleText + '</a>';
         } else if (item.youtubeRaw) {
-          // FIX: if our embed-ID parser didn't recognize this particular
-          // link format, don't just do nothing on click — open the raw
-          // link in a new tab instead so it still works.
           songHtml = '<a class="release-song release-song-link has-link" href="' + escapeHtml(item.youtubeRaw) + '" target="_blank" rel="noopener">' + linkIcon + titleText + '</a>';
         } else if (item.spotify) {
           songHtml = '<a class="release-song release-song-link has-link" href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">' + linkIcon + titleText + '</a>';
@@ -2478,10 +2326,6 @@
     }).join('');
   }
 
-  // Renders weeks for a single selected year as a collapsible list (newest
-  // first within that year, first one open) — same "pick a year, see its
-  // entries" shape as Top 10 Yearly, just with a dropdown since there are
-  // many weeks per year instead of one block per year.
   var selectedWeeklyYear = null;
 
   function loadTop5Weekly() {
@@ -2504,7 +2348,6 @@
     var select = document.getElementById('weekly-year-select');
     var filterWrap = document.getElementById('weekly-year-filter');
 
-    // allWeeklyData is already newest-first, so this naturally comes out newest-first too.
     var years = [];
     allWeeklyData.forEach(function (w) {
       var y = String(w.year || '');
@@ -2605,9 +2448,6 @@
     });
   }
 
-  // DEAN'S NERDCORE HONORS AWARDS — trophy-styled cards, not a plain list.
-  // Each category gets its own card: a big trophy + the winner's name up
-  // top, with any other nominees listed smaller underneath.
   function loadDeansAwards() {
     var container = document.getElementById('deans-awards-container');
     api('deansAwards').then(function (years) {
@@ -2713,10 +2553,6 @@
     });
   }
 
-  // ENCYCLOPEDIA — a page-by-page image "book", sourced from the
-  // Encyclopedia sheet tab (one exported page image per row) instead of
-  // a PDF. Pages are preloaded a page ahead/behind so flipping feels
-  // instant, and a short cross-fade + tilt stands in for a page turn.
   var encPages = [];
   var encPageNum = 1;
   var encPreloaded = {};
