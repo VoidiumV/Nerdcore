@@ -720,8 +720,8 @@
 <!-- BUG / QUALITY REPORT MODAL -->
 <div class="modal-overlay" id="bug-report-overlay">
   <div class="modal-box">
-    <h3>REPORT AN ISSUE</h3>
-    <p>What's wrong with this page? Select all that apply.</p>
+    <h3 id="bug-report-modal-title">REPORT AN ISSUE</h3>
+    <p id="bug-report-modal-desc">What's wrong with this page? Select all that apply.</p>
     <div class="bug-report-options" id="bug-report-options">
       <label class="bug-report-option"><input type="checkbox" value="Incorrect lyrics/grammar/spelling"> Incorrect lyrics / grammar / spelling</label>
       <label class="bug-report-option"><input type="checkbox" value="Incorrect audio link"> Incorrect audio link</label>
@@ -739,7 +739,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwkvNRLqyPHpM7GYZ70ni-YYx0YVXkvtULIoaI1-brYK0OIBOoQKH-mY-tlfTnjTHfC/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxM91Wy6ANWA8j71Fdz9cGi1yfuVzflToEOLkslVWLYe7Xh93fXm-A47GK7fR7oiPcY/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -874,8 +874,19 @@
 
   function openBugReportModal(context) {
     bugReportContext = context || {};
+    var isMissing = bugReportContext.mode === 'missing';
+
+    document.getElementById('bug-report-modal-title').textContent = isMissing ? 'REPORT A MISSING SONG' : 'REPORT AN ISSUE';
+    document.getElementById('bug-report-modal-desc').textContent = isMissing
+      ? "Know a song by " + (bugReportContext.artist || 'this artist') + " that should be on this site but isn't? Tell us the song title below (and a link, if you have one) and we'll add it."
+      : "What's wrong with this page? Select all that apply.";
+    document.getElementById('bug-report-options').style.display = isMissing ? 'none' : '';
+
     document.querySelectorAll('#bug-report-options input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
     document.getElementById('bug-report-text').value = '';
+    document.getElementById('bug-report-text').placeholder = isMissing
+      ? 'Song title, and a YouTube/Spotify link if you have one&hellip;'
+      : "(optional) what's wrong&hellip;";
     document.getElementById('bug-report-submit').textContent = 'SUBMIT';
     document.getElementById('bug-report-overlay').classList.add('open');
   }
@@ -884,22 +895,42 @@
     bugReportContext = null;
   }
 
+  function wireMissingSongLink_(artistName) {
+    var link = document.getElementById('artist-report-missing-link');
+    if (link) {
+      link.addEventListener('click', function () {
+        openBugReportModal({ mode: 'missing', artist: artistName });
+      });
+    }
+  }
+
   document.getElementById('bug-report-cancel').addEventListener('click', closeBugReportModal);
   document.getElementById('bug-report-overlay').addEventListener('click', function (e) {
     if (e.target === this) closeBugReportModal();
   });
   document.getElementById('bug-report-submit').addEventListener('click', function () {
     var btn = this;
-    var categories = Array.prototype.slice
-      .call(document.querySelectorAll('#bug-report-options input[type="checkbox"]:checked'))
-      .map(function (cb) { return cb.value; });
+    var isMissing = bugReportContext && bugReportContext.mode === 'missing';
     var message = document.getElementById('bug-report-text').value.trim();
+
+    if (isMissing && !message) {
+      alert('Add the song title so we know what to look for.');
+      return;
+    }
+
+    var categories = isMissing
+      ? 'Missing song'
+      : Array.prototype.slice
+          .call(document.querySelectorAll('#bug-report-options input[type="checkbox"]:checked'))
+          .map(function (cb) { return cb.value; })
+          .join(', ');
+
     btn.textContent = 'SENDING…';
     api('reportBug', {
       songId: (bugReportContext && bugReportContext.id) || '',
-      songTitle: (bugReportContext && bugReportContext.title) || '',
+      songTitle: (bugReportContext && bugReportContext.title) || (isMissing ? '(missing song)' : ''),
       artist: (bugReportContext && bugReportContext.artist) || '',
-      categories: categories.join(', '),
+      categories: categories,
       message: message
     }).then(function () {
       closeBugReportModal();
@@ -2036,8 +2067,17 @@
         '</div>' +
       '</div>';
 
+    var missingSongBlock =
+      '<div class="disclaimer-banner" style="margin-bottom:16px; font-size:15px;">' +
+        '&#9888; Wrong lyrics, art, or links on a song that\'s already listed? Use the "REPORT ISSUE" button on that song\'s own page instead \u2014 the link below is only for songs missing from this list.' +
+      '</div>' +
+      '<div style="display:flex; justify-content:flex-end; margin-bottom:16px;">' +
+        '<span class="back-link" id="artist-report-missing-link" style="margin-bottom:0;">+ Report a missing song by ' + escapeHtml(name) + '</span>' +
+      '</div>';
+
     if (!allSongs.length) {
-      container.innerHTML = header + '<div class="empty">No songs posted for this artist yet.</div>';
+      container.innerHTML = header + missingSongBlock + '<div class="empty">No songs posted for this artist yet.</div>';
+      wireMissingSongLink_(name);
       return;
     }
 
@@ -2077,7 +2117,8 @@
       }).join('');
     }
 
-    container.innerHTML = header + toolbarRow + cardsHtml;
+    container.innerHTML = header + missingSongBlock + toolbarRow + cardsHtml;
+    wireMissingSongLink_(name);
 
     var sortToggle = document.getElementById('artist-detail-sort-toggle');
     if (sortToggle) {
