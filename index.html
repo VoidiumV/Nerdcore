@@ -746,7 +746,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxf6LwgStnh-jqwdO3kknJ_H4neF563Q-7BOMH9-VfKag7HDdJjmYZl9dmu5OuRm4D5/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbx6YUYug1o3ZLUE4XGeMpQygdOvGu3J2LqdjfORy5zWAbhCp1I6IBQiq_lrJfmb5Zvl/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -1422,16 +1422,31 @@
     });
     var seen = {};
     var names = [];
+
+    function addArtistName_(rawName) {
+      var name = String(rawName || '').trim();
+      if (!name) return;
+      var key = normalizeArtistKey(name);
+      if (seen[key]) return;
+      seen[key] = true;
+      if (hiddenMap[key]) return;
+      names.push(name);
+    }
+
+    // 1) Anyone explicitly listed in the Artists sheet gets a tile right away --
+    //    even if they don't have a song as the main artist yet (e.g. so far they've
+    //    only shown up as a Featured Artist, or you're adding them ahead of time).
+    allArtists.forEach(function (a) { addArtistName_(a.artist); });
+
+    // 2) Anyone who's the main artist OR a featured artist on any Lyrics row.
+    //    (Previously this only looked at the main "Artist Name" column, so an artist
+    //    who only ever appears in "Featured Artist(s)" never got their own tile here,
+    //    even though visiting their page directly by URL always worked.)
     allLyrics.forEach(function (item) {
-      if (isNA(item.artist)) return;
-      splitArtistNames(item.artist).forEach(function (name) {
-        var key = normalizeArtistKey(name);
-        if (seen[key]) return;
-        seen[key] = true;
-        if (hiddenMap[key]) return;
-        names.push(name);
-      });
+      if (!isNA(item.artist)) splitArtistNames(item.artist).forEach(addArtistName_);
+      if (!isNA(item.featured)) splitArtistNames(item.featured).forEach(addArtistName_);
     });
+
     var q = artistSearchQuery.trim().toLowerCase();
     if (q) names = names.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
     names.sort(function (a, b) {
