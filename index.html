@@ -207,7 +207,7 @@
     font-family:'VT323', monospace; font-size:17px; color:var(--muted);
     margin-top:8px; line-height:1.5; white-space:normal; overflow-wrap:break-word; word-break:break-word;
   }
-  .detail-featured b{ color:var(--amber); }
+  .detail-featured .feat-name{ color:var(--amber); font-weight:normal; }
   @media(max-width:620px){
     .detail-hero{ flex-direction:column; }
     .detail-hero-img{ width:100%; height:220px; border-right:none; border-bottom:3px solid var(--border); }
@@ -2331,7 +2331,7 @@
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(post.title) + '</h1>' +
           '<div class="detail-meta"><span>by <b>' + escapeHtml(post.artist) + '</b></span><span>' + escapeHtml(post.dateStr) + '</span></div>' +
-          (post.featured && !isNA(post.featured) ? '<div class="detail-featured">feat. <b>' + escapeHtml(post.featured) + '</b></div>' : '') +
+          (post.featured && !isNA(post.featured) ? '<div class="detail-featured">feat. <span class="feat-name">' + escapeHtml(post.featured) + '</span></div>' : '') +
           tagsHtml +
         '</div>' +
       '</div>' +
