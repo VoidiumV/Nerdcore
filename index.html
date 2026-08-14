@@ -2033,9 +2033,10 @@
         '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
           '<img class="lyric-cover" src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
           '<div class="lyric-body">' +
-            '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
-            '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
-            '<div class="lyric-meta-row">' + badge + '</div>' +
+              '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
+              '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
+              (item.featured && !isNA(item.featured) ? '<p class="lyric-featured">feat. ' + escapeHtml(item.featured) + '</p>' : '') +
+              '<div class="lyric-meta-row">' + badge + '</div>' +
             '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
           '</div>' +
         '</div>'
@@ -2192,6 +2193,7 @@
             '<div class="lyric-body">' +
               '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
               '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
+              (item.featured && !isNA(item.featured) ? '<p class="lyric-featured">feat. ' + escapeHtml(item.featured) + '</p>' : '') +
               '<div class="lyric-meta-row">' + badge + '</div>' +
               '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
             '</div>' +
@@ -2329,6 +2331,7 @@
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(post.title) + '</h1>' +
           '<div class="detail-meta"><span>by <b>' + escapeHtml(post.artist) + '</b></span><span>' + escapeHtml(post.dateStr) + '</span></div>' +
+          (post.featured && !isNA(post.featured) ? '<div class="detail-featured">feat. <b>' + escapeHtml(post.featured) + '</b></div>' : '') +
           tagsHtml +
         '</div>' +
       '</div>' +
@@ -2402,14 +2405,19 @@
         var typeBadge = '';
         if (item.releaseType === 'Album') typeBadge = '<span class="badge album release-type-badge">Album</span>';
         else if (item.releaseType === 'EP') typeBadge = '<span class="badge ep release-type-badge">EP</span>';
+        var featuredHtml = (item.featured && !isNA(item.featured))
+          ? '<div class="release-featured">feat. ' + escapeHtml(item.featured) + '</div>'
+          : '';
         return (
           '<div class="release-card">' +
             typeBadge +
             '<div class="release-info"' + (typeBadge ? ' style="padding-right:52px;"' : '') + '>' +
               songHtml +
               '<div class="release-artist">' + escapeHtml(item.artist) + '</div>' +
+              featuredHtml +
             '</div>' +
           '</div>'
+        );
         );
       }).join('');
 
