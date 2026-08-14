@@ -328,25 +328,11 @@
   }
   .release-song{ font-family:'VT323', monospace; font-size:17px; color:var(--ink); white-space:normal; overflow-wrap:break-word; word-break:break-word; display:block; line-height:1.3; }
   .release-artist{ font-family:'VT323', monospace; font-size:15px; color:var(--muted); white-space:normal; overflow-wrap:break-word; word-break:break-word; line-height:1.3; }
+  .release-featured{ font-family:'VT323', monospace; font-size:14px; color:var(--amber); margin-top:2px; line-height:1.2; word-break:break-word; }
   .release-song-link{ cursor:pointer; text-decoration:none; }
   .release-song-link.has-link{ color:var(--green); text-decoration:underline; text-underline-offset:3px; }
   .release-song-link.has-link:hover{ color:var(--amber); }
   .release-link-ico{ display:inline-block; margin-right:6px; font-size:13px; }
-
-  /* ---------- releases featured artists extension ---------- */
-  .release-featured-wrap { position: relative; margin-top: 6px; }
-  .release-featured {
-    font-family: 'VT323', monospace; font-size: 15px; color: var(--amber);
-    max-height: 1.3em; overflow: hidden; line-height: 1.3;
-    transition: max-height 0.3s ease; white-space: normal; word-break: break-word;
-  }
-  .release-featured.expanded { max-height: 300px; }
-  .expand-feat-btn {
-    font-family: 'Press Start 2P', monospace; font-size: 8px;
-    background: var(--panel-2); color: var(--green); border: 1px solid var(--border);
-    padding: 4px 6px; cursor: pointer; margin-top: 4px; display: inline-block;
-  }
-  .expand-feat-btn:hover { background: var(--green); color: #0b0e1a; }
 
   /* ---------- subtabs ---------- */
   .subtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:24px; }
@@ -521,6 +507,23 @@
   }
   .modal-btn.primary{ color:var(--green); border-color:var(--green); }
   .modal-btn.primary:hover{ box-shadow:3px 3px 0 rgba(0,0,0,0.4); }
+
+  /* Expanded / Collapsible Featured Artist Truncation */
+  .feat-expand-btn{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    background:var(--panel);
+    color:var(--amber);
+    border:1px solid var(--amber);
+    padding:3px 6px;
+    margin-top:4px;
+    cursor:pointer;
+    display:inline-block;
+  }
+  .feat-expand-btn:hover{
+    background:var(--amber);
+    color:#0b0e1a;
+  }
 </style>
 </head>
 <body>
@@ -848,11 +851,15 @@
   var currentArtistDetail = null;
   var artistDetailSortDir = 'asc';
   var artistDetailSearchQuery = '';
+  var artistDetailViewMode = 'main'; // 'main' | 'featured'
+  var artistDetailSortField = 'song'; // 'song' | 'artist'
+  var artistDetailSecondaryDir = 'asc';
   var lyricsLoaded = false;
   var releasesLoaded = false;
   var top5Loaded = false;
   var encyclopediaLoaded = false;
 
+  // NEW: "Browse by Franchise" state
   var lyricsBrowseMode = 'artist'; // 'artist' | 'franchise'
   var allFranchises = [];
   var allCharacters = [];
@@ -860,17 +867,24 @@
   var charactersLoaded = false;
   var franchiseSortDir = 'asc';
   var franchiseSearchQuery = '';
-  var currentFranchiseDetail = null;
+  var currentFranchiseDetail = null;      // franchise name, while viewing its character grid
   var franchiseCharSortDir = 'asc';
   var franchiseCharSearchQuery = '';
-  var currentFranchiseCharDetail = null;
-  var currentFranchiseAllDetail = null;
-  var currentFranchiseGeneralDetail = null;
-  var currentArtistFeaturedDetail = null;
-  var franchiseSongsSortDir = 'asc';
-  var franchiseSongsSortField = 'song';
-  var franchiseSongsArtistSecondaryDir = 'asc';
+  var currentFranchiseCharDetail = null;  // {franchise, character}, while viewing a character's songs
+  var currentFranchiseAllDetail = null;   // franchise name, while viewing "all songs" for it
+  var currentFranchiseGeneralDetail = null; // franchise name, while viewing "general / no character" songs for it
+  var franchiseSongsSortDir = 'asc';        // direction for the current primary sort field (song title, or artist name)
+  var franchiseSongsSortField = 'song';     // 'song' | 'artist'
+  var franchiseSongsArtistSecondaryDir = 'asc'; // when sortField is 'artist', direction used for song titles within each artist
   var franchiseSongsSearchQuery = '';
+
+  // Helper for checking if an artist is listed as a feature
+  function isFeaturedArtist_(songItem, artistName) {
+    var feat = songItem.featuredArtist || songItem.featured || songItem.ft || songItem.feat || '';
+    if (isNA(feat)) return false;
+    var target = normalizeArtistKey(artistName);
+    return splitArtistNames(feat).some(function (n) { return normalizeArtistKey(n) === target; });
+  }
 
   // FLOATING PLAYER LOGIC
   function openFloatingPlayer(url) {
@@ -1061,7 +1075,6 @@
     currentFranchiseCharDetail = null;
     currentFranchiseAllDetail = null;
     currentFranchiseGeneralDetail = null;
-    currentArtistFeaturedDetail = null;
     if (!lyricsLoaded) loadLyrics(); else loadArtistsData();
     if (lyricsBrowseMode === 'franchise' && !franchisesLoaded) loadFranchiseBrowse();
   }
@@ -1075,9 +1088,11 @@
     currentFranchiseCharDetail = null;
     currentFranchiseAllDetail = null;
     currentFranchiseGeneralDetail = null;
-    currentArtistFeaturedDetail = null;
     artistDetailSortDir = 'asc';
     artistDetailSearchQuery = '';
+    artistDetailViewMode = 'main';
+    artistDetailSortField = 'song';
+    artistDetailSecondaryDir = 'asc';
     if (!lyricsLoaded) {
       document.getElementById('artist-detail-content').innerHTML = '<div class="loading">Loading&hellip;</div>';
       api('lyrics').then(function (list) {
@@ -1095,14 +1110,161 @@
     if (!franchisesLoaded) {
       api('franchises').then(function (list) {
         allFranchises = list || []; franchisesLoaded = true;
+        if (currentArtistDetail === name && artistDetailSearchQuery) renderArtistDetail(name);
       }).catch(function () { franchisesLoaded = true; });
     }
     if (!charactersLoaded) {
       api('characters').then(function (list) {
         allCharacters = list || []; charactersLoaded = true;
+        if (currentArtistDetail === name && artistDetailSearchQuery) renderArtistDetail(name);
       }).catch(function () { charactersLoaded = true; });
     }
   }
+
+  function renderArtistDetail(name) {
+    var container = document.getElementById('artist-detail-content');
+    var key = normalizeArtistKey(name);
+
+    var mainSongs = allLyrics.filter(function (item) {
+      if (isNA(item.artist)) return false;
+      return splitArtistNames(item.artist).some(function (a) { return normalizeArtistKey(a) === key; });
+    });
+
+    var featSongs = allLyrics.filter(function (item) {
+      return isFeaturedArtist_(item, name);
+    });
+
+    var isFeatMode = (artistDetailViewMode === 'featured');
+    var activeList = isFeatMode ? featSongs : mainSongs;
+
+    var sorted = activeList.slice();
+    if (artistDetailSortField === 'artist') {
+      sorted.sort(function (a, b) {
+        var artCmp = String(a.artist || '').localeCompare(String(b.artist || ''));
+        if (artCmp !== 0) return artistDetailSortDir === 'asc' ? artCmp : -artCmp;
+        var titleCmp = String(a.title || '').localeCompare(String(b.title || ''));
+        return artistDetailSecondaryDir === 'asc' ? titleCmp : -titleCmp;
+      });
+    } else {
+      sorted.sort(function (a, b) {
+        var cmp = String(a.title || '').localeCompare(String(b.title || ''));
+        return artistDetailSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    var q = artistDetailSearchQuery.trim().toLowerCase();
+    var filtered = q ? sorted.filter(function (s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; }) : sorted;
+
+    var fallback = getFallbackImage();
+    var meta = allArtists.filter(function (a) { return normalizeArtistKey(a.artist) === key; })[0] || {};
+    var heroImg = meta.pfp ? optimizeArtUrl(meta.pfp, 440) : fallback;
+
+    var header =
+      '<div class="detail-hero">' +
+        '<img class="detail-hero-img" src="' + escapeHtml(heroImg) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
+        '<div class="detail-hero-text">' +
+          '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
+          '<div class="detail-meta"><span>' + mainSongs.length + (mainSongs.length === 1 ? ' song' : ' songs') + '</span><span>' + featSongs.length + ' features</span></div>' +
+        '</div>' +
+      '</div>';
+
+    var featToggleBtn =
+      '<div style="margin-bottom:18px;">' +
+        '<div class="subtab ' + (isFeatMode ? 'active' : '') + '" id="artist-feat-mode-btn" style="display:inline-block;">' +
+          (isFeatMode ? 'SHOW MAIN SONGS' : 'SHOW FEATURED SONGS (' + featSongs.length + ')') +
+        '</div>' +
+      '</div>';
+
+    var fieldLabel = artistDetailSortField === 'artist' ? 'ARTIST' : 'SONG';
+    var dirFirst = artistDetailSortDir === 'asc' ? 'A' : 'Z';
+    var dirSecond = artistDetailSortDir === 'asc' ? 'Z' : 'A';
+    var secondaryFirst = artistDetailSecondaryDir === 'asc' ? 'A' : 'Z';
+    var secondarySecond = artistDetailSecondaryDir === 'asc' ? 'Z' : 'A';
+
+    var toolbarRow =
+      '<div class="artist-detail-toolbar">' +
+        '<input type="text" class="search-box artist-detail-search" id="artist-detail-search" placeholder="Search songs&hellip;" value="' + escapeHtml(artistDetailSearchQuery) + '">' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+          '<div class="nav-tab" id="artist-detail-sortfield-toggle">SORT BY: ' + fieldLabel + '</div>' +
+          '<div class="nav-tab" id="artist-detail-sortdir-toggle">' + dirFirst + '<span class="sort-arrow">&#8594;</span>' + dirSecond + '</div>' +
+          (artistDetailSortField === 'artist'
+            ? '<div class="nav-tab" id="artist-detail-secondary-toggle">SONGS: ' + secondaryFirst + '<span class="sort-arrow">&#8594;</span>' + secondarySecond + '</div>'
+            : '') +
+        '</div>' +
+      '</div>';
+
+    var cardsHtml = !filtered.length ? '<div class="empty">No songs found.</div>' : filtered.map(function (item) {
+      var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 240)) : fallback;
+      var lockedClass = item.isLocked ? ' locked' : '';
+      var badge = item.isLocked ? '<span class="badge locked">Locked</span>' : (item.isUpcoming ? '<span class="badge upcoming">Upcoming</span>' : '');
+      var featStr = item.featuredArtist || item.featured || item.ft || item.feat || '';
+      var featHtml = !isNA(featStr) ? '<div class="release-featured">ft. ' + escapeHtml(featStr) + '</div>' : '';
+
+      return (
+        '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '" data-locked="' + item.isLocked + '">' +
+          '<img class="lyric-cover" src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
+          '<div class="lyric-body">' +
+            '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
+            '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
+            featHtml +
+            '<div class="lyric-meta-row">' + badge + '</div>' +
+            '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    container.innerHTML = header + featToggleBtn + toolbarRow + cardsHtml;
+
+    document.getElementById('artist-feat-mode-btn').addEventListener('click', function () {
+      artistDetailViewMode = isFeatMode ? 'main' : 'featured';
+      renderArtistDetail(name);
+    });
+
+    var sortFieldToggle = document.getElementById('artist-detail-sortfield-toggle');
+    if (sortFieldToggle) {
+      sortFieldToggle.addEventListener('click', function () {
+        artistDetailSortField = artistDetailSortField === 'song' ? 'artist' : 'song';
+        artistDetailSortDir = 'asc';
+        renderArtistDetail(name);
+      });
+    }
+
+    var sortDirToggle = document.getElementById('artist-detail-sortdir-toggle');
+    if (sortDirToggle) {
+      sortDirToggle.addEventListener('click', function () {
+        artistDetailSortDir = artistDetailSortDir === 'asc' ? 'desc' : 'asc';
+        renderArtistDetail(name);
+      });
+    }
+
+    var secondaryToggle = document.getElementById('artist-detail-secondary-toggle');
+    if (secondaryToggle) {
+      secondaryToggle.addEventListener('click', function () {
+        artistDetailSecondaryDir = artistDetailSecondaryDir === 'asc' ? 'desc' : 'asc';
+        renderArtistDetail(name);
+      });
+    }
+
+    var searchInput = document.getElementById('artist-detail-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        artistDetailSearchQuery = this.value;
+        var caret = this.selectionStart;
+        renderArtistDetail(name);
+        var freshInput = document.getElementById('artist-detail-search');
+        if (freshInput) { freshInput.focus(); try { freshInput.setSelectionRange(caret, caret); } catch (e) { } }
+      });
+    }
+
+    container.querySelectorAll('.lyric-card[data-id]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        if (card.getAttribute('data-locked') === 'true') return;
+        showLyricsDetail(card.getAttribute('data-id'));
+      });
+    });
+  }
+
   function showLyricsDetail(id) {
     hideAllViews();
     document.getElementById('view-lyrics-detail').style.display = '';
@@ -1111,6 +1273,54 @@
     document.getElementById('lyrics-detail-content').innerHTML = '<div class="loading">Loading lyrics&hellip;</div>';
     loadLyricDetail(id);
   }
+
+  function loadLyricDetail(id) {
+    var container = document.getElementById('lyrics-detail-content');
+    api('lyricDetail', { id: id }).then(function (item) {
+      if (!item) { container.innerHTML = '<div class="empty">Lyrics not found.</div>'; return; }
+      renderLyricDetail(item);
+    }).catch(function (err) {
+      renderErrorWithRetry(container, "Couldn't load lyric details: " + escapeHtml(err.message || err), function () { loadLyricDetail(id); });
+    });
+  }
+
+  function renderLyricDetail(item) {
+    var container = document.getElementById('lyrics-detail-content');
+    var fallback = getFallbackImage();
+    var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 440)) : fallback;
+    var featStr = item.featuredArtist || item.featured || item.ft || item.feat || '';
+    var featHtml = !isNA(featStr) ? '<div class="detail-featured"><b>Featured:</b> ' + escapeHtml(featStr) + '</div>' : '';
+
+    var streamBtns = [];
+    if (item.spotify) streamBtns.push('<a class="stream-btn spotify" href="' + escapeHtml(item.spotify) + '" target="_blank" rel="noopener">&#9654; SPOTIFY</a>');
+    if (item.apple) streamBtns.push('<a class="stream-btn apple" href="' + escapeHtml(item.apple) + '" target="_blank" rel="noopener">&#9654; APPLE MUSIC</a>');
+    if (item.youtube) streamBtns.push('<a class="stream-btn youtube" href="' + escapeHtml(item.youtube) + '" target="_blank" rel="noopener">&#9654; YOUTUBE</a>');
+
+    var streamRow = streamBtns.length ? '<div class="stream-row">' + streamBtns.join('') + '</div>' : '';
+
+    var lyricsBody = item.lyrics
+      ? '<div class="lyrics-content">' + escapeHtml(item.lyrics).replace(/\n/g, '<br>') + '</div>'
+      : '<div class="empty">No lyrics text available for this track yet.</div>';
+
+    container.innerHTML =
+      '<div class="detail-hero">' +
+        '<button class="report-btn-corner" id="detail-report-btn">&#9888; REPORT ISSUE</button>' +
+        '<img class="detail-hero-img" src="' + img + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
+        '<div class="detail-hero-text">' +
+          '<h1 class="detail-title">' + escapeHtml(item.title) + '</h1>' +
+          '<div class="detail-meta"><span>By <b>' + escapeHtml(item.artist) + '</b></span>' +
+          (item.dateStr ? '<span>' + escapeHtml(item.dateStr) + '</span>' : '') + '</div>' +
+          featHtml +
+        '</div>' +
+      '</div>' +
+      streamRow +
+      lyricsBody;
+
+    document.getElementById('detail-report-btn').addEventListener('click', function () {
+      openBugReportModal({ id: item.id, title: item.title, artist: item.artist });
+    });
+  }
+
   function showEncyclopedia() {
     hideAllViews();
     document.getElementById('view-encyclopedia').style.display = '';
@@ -1125,6 +1335,88 @@
     setPath('releases');
     if (!releasesLoaded) loadReleases();
   }
+
+  function loadReleases() {
+    var upContainer = document.getElementById('relpane-upcoming');
+    var relContainer = document.getElementById('relpane-released');
+    api('releases').then(function (data) {
+      releasesLoaded = true;
+      renderReleasesPane(upContainer, data.upcoming || []);
+      renderReleasesPane(relContainer, data.released || []);
+    }).catch(function (err) {
+      renderErrorWithRetry(upContainer, "Couldn't load releases: " + escapeHtml(err.message || err), loadReleases);
+      renderErrorWithRetry(relContainer, "Couldn't load releases: " + escapeHtml(err.message || err), loadReleases);
+    });
+  }
+
+  function renderReleasesPane(container, days) {
+    if (!days.length) {
+      container.innerHTML = '<div class="empty">No releases listed in this tab.</div>';
+      return;
+    }
+
+    container.innerHTML = days.map(function (day, dIdx) {
+      var songsHtml = day.songs.map(function (song, sIdx) {
+        var featStr = song.featuredArtist || song.featured || song.ft || song.feat || '';
+        var featList = splitArtistNames(featStr);
+        var cardId = 'rel-card-' + dIdx + '-' + sIdx;
+
+        var featContent = '';
+        if (featList.length > 0) {
+          if (featList.length <= 2) {
+            featContent = '<div class="release-featured">ft. ' + escapeHtml(featStr) + '</div>';
+          } else {
+            var collapsedTxt = 'ft. ' + escapeHtml(featList.slice(0, 2).join(', ')) + '&hellip;';
+            var fullTxt = 'ft. ' + escapeHtml(featStr);
+            featContent =
+              '<div class="release-featured" id="' + cardId + '-text">' + collapsedTxt + '</div>' +
+              '<div class="feat-expand-btn" data-card="' + cardId + '" data-full="' + escapeHtml(fullTxt) + '" data-short="' + escapeHtml(collapsedTxt) + '">+ MORE</div>';
+          }
+        }
+
+        var titleHtml = song.link
+          ? '<a class="release-song release-song-link has-link" href="' + escapeHtml(song.link) + '" target="_blank" rel="noopener"><span class="release-link-ico">&#9654;</span>' + escapeHtml(song.title) + '</a>'
+          : '<span class="release-song">' + escapeHtml(song.title) + '</span>';
+
+        return (
+          '<div class="release-card">' +
+            '<div class="release-info">' +
+              titleHtml +
+              '<div class="release-artist">by ' + escapeHtml(song.artist) + '</div>' +
+              featContent +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+
+      return (
+        '<div class="release-day">' +
+          '<div class="release-day-head">' +
+            '<span class="release-day-date">' + escapeHtml(day.date) + '</span>' +
+            '<span class="release-day-count">(' + day.songs.length + ')</span>' +
+          '</div>' +
+          '<div class="release-grid">' + songsHtml + '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    container.querySelectorAll('.feat-expand-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var cardId = btn.getAttribute('data-card');
+        var txtEl = document.getElementById(cardId + '-text');
+        var isExpanded = btn.textContent === '- LESS';
+        if (isExpanded) {
+          txtEl.innerHTML = btn.getAttribute('data-short');
+          btn.textContent = '+ MORE';
+        } else {
+          txtEl.innerHTML = btn.getAttribute('data-full');
+          btn.textContent = '- LESS';
+        }
+      });
+    });
+  }
+
   function showTop5() {
     hideAllViews();
     document.getElementById('view-top5').style.display = '';
@@ -1132,6 +1424,7 @@
     setPath('top5');
     if (!top5Loaded) loadTop5();
   }
+
   function showIndieMonday() {
     hideAllViews();
     document.getElementById('view-indiemonday').style.display = '';
@@ -1213,11 +1506,6 @@
     if (!path || path === 'home') { showHome(); return; }
     if (path === 'lyrics') { showLyricsList(); return; }
     if (path.indexOf('artist-') === 0) { showArtistDetail(decodeURIComponent(path.slice(7))); return; }
-    if (path.indexOf('artist/') === 0 && path.indexOf('/featured') !== -1) {
-      var artistName = path.split('/')[1];
-      if(artistName) showArtistFeaturedSongs(decodeURIComponent(artistName));
-      return;
-    }
     if (path.indexOf('lyric-') === 0) { showLyricsDetail(path.slice(6)); return; }
     if (path.indexOf('franchise/') === 0) {
       var rest = path.slice('franchise/'.length);
@@ -1678,7 +1966,6 @@
     currentFranchiseAllDetail = null;
     currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
-    currentArtistFeaturedDetail = null;
     franchiseCharSortDir = 'asc';
     franchiseCharSearchQuery = '';
 
@@ -1804,7 +2091,6 @@
     currentFranchiseAllDetail = null;
     currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
-    currentArtistFeaturedDetail = null;
     franchiseSongsSortDir = 'asc';
     franchiseSongsSortField = 'song';
     franchiseSongsArtistSecondaryDir = 'asc';
@@ -1849,7 +2135,6 @@
     currentFranchiseCharDetail = null;
     currentFranchiseGeneralDetail = null;
     currentArtistDetail = null;
-    currentArtistFeaturedDetail = null;
     franchiseSongsSortDir = 'asc';
     franchiseSongsSortField = 'song';
     franchiseSongsArtistSecondaryDir = 'asc';
@@ -1888,7 +2173,6 @@
     currentFranchiseAllDetail = null;
     currentFranchiseCharDetail = null;
     currentArtistDetail = null;
-    currentArtistFeaturedDetail = null;
     franchiseSongsSortDir = 'asc';
     franchiseSongsSortField = 'song';
     franchiseSongsArtistSecondaryDir = 'asc';
@@ -2026,9 +2310,9 @@
       });
     }
 
-    var songsSearch = document.getElementById('franchise-songs-search');
-    if (songsSearch) {
-      songsSearch.addEventListener('input', function () {
+    var searchInput = document.getElementById('franchise-songs-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
         franchiseSongsSearchQuery = this.value;
         var caret = this.selectionStart;
         renderFranchiseSongsPage_(title, subtitle, songsForPage, heroImage);
@@ -2037,275 +2321,34 @@
       });
     }
 
-    container.querySelectorAll('.lyric-card').forEach(function(card) {
-       card.addEventListener('click', function() {
-          var id = card.getAttribute('data-id');
-          if (id) showLyricsDetail(id);
-       });
+    container.querySelectorAll('.lyric-card[data-id]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        if (card.getAttribute('data-locked') === 'true') return;
+        showLyricsDetail(card.getAttribute('data-id'));
+      });
     });
   }
 
-  // ---------- MISSING AND NEW FUNCTIONS (Artist Detail & Featured Songs) ----------
-
-  function renderArtistDetail(name) {
-    var container = document.getElementById('artist-detail-content');
-    var nameKey = normalizeArtistKey(name);
-    
-    var songs = allLyrics.filter(function(item) {
-       return !isNA(item.artist) && splitCsv_(item.artist).some(function(a) { return normalizeArtistKey(a) === nameKey; });
-    });
-    
-    var meta = allArtists.filter(function(a) { return normalizeArtistKey(a.artist) === nameKey; })[0] || {};
-    var fallback = getFallbackImage();
-    var heroImg = meta.pfp ? optimizeArtUrl(meta.pfp, 440) : fallback;
-
-    var featuredSongs = allLyrics.filter(function(item) {
-       return !isNA(item.featured) && splitCsv_(item.featured).some(function(f) { return normalizeArtistKey(f) === nameKey; });
-    });
-
-    var header = '<div class="detail-hero">' +
-      '<img class="detail-hero-img" src="' + escapeHtml(heroImg) + '" loading="eager" decoding="async" onerror="this.src=\'' + fallback + '\'">' +
-      '<div class="detail-hero-text">' +
-        '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
-        '<div class="detail-meta"><span>' + songs.length + (songs.length === 1 ? ' song' : ' songs') + '</span></div>' +
-      '</div></div>';
-
-    var featuredTile = '';
-    if (featuredSongs.length > 0) {
-       featuredTile = '<div class="lyric-card" id="artist-featured-songs-tile" style="margin-bottom:22px;">' +
-         '<div class="lyric-body" style="padding:18px;">' +
-           '<p class="lyric-title">&#9654; VIEW ALL SONGS FEATURING ' + escapeHtml(name.toUpperCase()) + '</p>' +
-           '<p class="lyric-artist">' + featuredSongs.length + (featuredSongs.length === 1 ? ' song' : ' songs') + '</p>' +
-         '</div></div>';
-    }
-
-    var toolbarRow = '<div class="artist-detail-toolbar">' +
-      '<input type="text" class="search-box artist-detail-search" id="artist-detail-search-box" placeholder="Search songs..." value="' + escapeHtml(artistDetailSearchQuery) + '">' +
-      '<div class="nav-tab" id="artist-detail-sort-toggle">SORT: ' + (artistDetailSortDir === 'asc' ? 'A<span class="sort-arrow">&#8594;</span>Z' : 'Z<span class="sort-arrow">&#8594;</span>A') + '</div>' +
-    '</div>';
-
-    var sorted = songs.slice().sort(function(a, b) {
-       var cmp = String(a.title || '').localeCompare(String(b.title || ''));
-       return artistDetailSortDir === 'asc' ? cmp : -cmp;
-    });
-    
-    var q = artistDetailSearchQuery.toLowerCase();
-    if (q) sorted = sorted.filter(function(s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; });
-
-    var cardsHtml = !sorted.length ? '<div class="empty">No songs found.</div>' : sorted.map(function (item) {
-      var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 240)) : fallback;
-      var lockedClass = item.isLocked ? ' locked' : '';
-      var badge = item.isLocked ? '<span class="badge locked">Locked</span>' : (item.isUpcoming ? '<span class="badge upcoming">Upcoming</span>' : '');
-      return '<div class="lyric-card' + lockedClass + '" data-id="' + escapeHtml(item.id) + '">' +
-        '<img class="lyric-cover" src="' + img + '" onerror="this.src=\'' + fallback + '\'">' +
-        '<div class="lyric-body">' +
-          '<p class="lyric-title">' + escapeHtml(item.title) + '</p>' +
-          '<p class="lyric-artist">by ' + escapeHtml(item.artist) + '</p>' +
-          '<div class="lyric-meta-row">' + badge + '</div>' +
-          '<span class="date-str">' + escapeHtml(item.dateStr) + '</span>' +
-        '</div></div>';
-    }).join('');
-
-    container.innerHTML = header + featuredTile + toolbarRow + cardsHtml;
-
-    var featTileEl = document.getElementById('artist-featured-songs-tile');
-    if (featTileEl) {
-       featTileEl.addEventListener('click', function() {
-          showArtistFeaturedSongs(name);
-       });
-    }
-
-    var stToggle = document.getElementById('artist-detail-sort-toggle');
-    if (stToggle) {
-       stToggle.addEventListener('click', function() {
-          artistDetailSortDir = artistDetailSortDir === 'asc' ? 'desc' : 'asc';
-          renderArtistDetail(name);
-       });
-    }
-
-    var sb = document.getElementById('artist-detail-search-box');
-    if (sb) {
-       sb.addEventListener('input', function() {
-          artistDetailSearchQuery = this.value;
-          var caret = this.selectionStart;
-          renderArtistDetail(name);
-          var fresh = document.getElementById('artist-detail-search-box');
-          if (fresh) { fresh.focus(); fresh.setSelectionRange(caret, caret); }
-       });
-    }
-
-    container.querySelectorAll('.lyric-card[data-id]').forEach(function(card) {
-       card.addEventListener('click', function() {
-          showLyricsDetail(card.getAttribute('data-id'));
-       });
-    });
-  }
-
-  function showArtistFeaturedSongs(name) {
-    hideAllViews();
-    document.getElementById('view-franchise-songs').style.display = '';
-    setActiveTab('lyrics');
-    setPath('artist/' + encodeURIComponent(name) + '/featured');
-
-    currentArtistFeaturedDetail = name;
-    currentFranchiseDetail = null;
-    currentFranchiseCharDetail = null;
-    currentFranchiseAllDetail = null;
-    currentFranchiseGeneralDetail = null;
-    currentArtistDetail = null;
-
-    franchiseSongsSortDir = 'asc';
-    franchiseSongsSortField = 'song';
-    franchiseSongsArtistSecondaryDir = 'asc';
-    franchiseSongsSearchQuery = '';
-
-    var nameKey = normalizeArtistKey(name);
-    var featuredSongs = allLyrics.filter(function(item) {
-       return !isNA(item.featured) && splitCsv_(item.featured).some(function(f) { return normalizeArtistKey(f) === nameKey; });
-    });
-    var meta = allArtists.filter(function(a) { return normalizeArtistKey(a.artist) === nameKey; })[0] || {};
-
-    renderFranchiseSongsPage_('Featured On', 'Songs featuring ' + name, featuredSongs, meta.pfp || '');
-  }
-
-  // ---------- LYRIC DETAIL IMPLEMENTATION ----------
-  function loadLyricDetail(id) {
-     api('lyricDetail', { id: id }).then(function(item) {
-        if (!item) {
-           document.getElementById('lyrics-detail-content').innerHTML = '<div class="empty">Song not found.</div>';
-           return;
-        }
-        var fallback = getFallbackImage();
-        var img = item.cover ? escapeHtml(optimizeArtUrl(item.cover, 440)) : fallback;
-        var lyricsHtml = item.lyrics ? item.lyrics : '<div class="empty">Lyrics coming soon...</div>';
-
-        var featHtml = '';
-        if (item.featured && !isNA(item.featured)) {
-            featHtml = '<div class="detail-featured"><b>FEATURED:</b> ' + escapeHtml(item.featured) + '</div>';
-        }
-
-        var header = '<div class="detail-hero">' +
-           '<img class="detail-hero-img" src="' + img + '" onerror="this.src=\'' + fallback + '\'">' +
-           '<div class="detail-hero-text">' +
-             '<h1 class="detail-title">' + escapeHtml(item.title) + '</h1>' +
-             '<div class="detail-meta"><b>' + escapeHtml(item.artist) + '</b></div>' +
-             featHtml +
-           '</div></div>';
-
-        var streamRow = '<div class="stream-row">';
-        if (item.spotify) streamRow += '<a class="stream-btn spotify" href="'+escapeHtml(item.spotify)+'" target="_blank">SPOTIFY</a>';
-        if (item.youtube) streamRow += '<a class="stream-btn youtube" href="'+escapeHtml(item.youtube)+'" target="_blank">YOUTUBE</a>';
-        if (item.apple) streamRow += '<a class="stream-btn apple" href="'+escapeHtml(item.apple)+'" target="_blank">APPLE</a>';
-        streamRow += '</div>';
-
-        document.getElementById('lyrics-detail-content').innerHTML = header + streamRow + '<div class="lyrics-content">' + lyricsHtml + '</div>';
-
-     }).catch(function(err) {
-        renderErrorWithRetry(document.getElementById('lyrics-detail-content'), 'Failed to load lyrics.', function() { loadLyricDetail(id); });
-     });
-  }
-
-  // ---------- RELEASES IMPLEMENTATION ----------
-  function loadReleases() {
-     api('releases').then(function(res) {
-        releasesLoaded = true;
-        renderReleases(res.upcoming || [], 'relpane-upcoming');
-        renderReleases(res.released || [], 'relpane-released');
-     }).catch(function(err) {
-        renderErrorWithRetry(document.getElementById('relpane-upcoming'), 'Failed to load releases.', loadReleases);
-        renderErrorWithRetry(document.getElementById('relpane-released'), 'Failed to load releases.', loadReleases);
-     });
-  }
-
-  function renderReleases(list, containerId) {
-     var container = document.getElementById(containerId);
-     if (!list.length) {
-        container.innerHTML = '<div class="empty">No releases found.</div>';
-        return;
-     }
-
-     var html = '<div class="release-grid">';
-     list.forEach(function(item) {
-        var featHtml = '';
-        if (item.featured && !isNA(item.featured)) {
-            var needsExpand = item.featured.length > 40;
-            featHtml = '<div class="release-featured-wrap">' +
-               '<div class="release-featured">Feat: ' + escapeHtml(item.featured) + '</div>' +
-               (needsExpand ? '<button class="expand-feat-btn">MORE</button>' : '') +
-            '</div>';
-        }
-
-        html += '<div class="release-card">' +
-           '<div class="release-info">' +
-              '<span class="release-type-badge badge ' + (item.type === 'album' ? 'album' : 'upcoming') + '">' + escapeHtml(item.type || 'Single') + '</span>' +
-              '<span class="release-song">' + escapeHtml(item.title) + '</span>' +
-              '<span class="release-artist">by ' + escapeHtml(item.artist) + '</span>' +
-              '<span class="date-str" style="display:block; margin-top:4px; font-size:13px;">' + escapeHtml(item.dateStr || '') + '</span>' +
-              featHtml +
-           '</div>' +
-        '</div>';
-     });
-     html += '</div>';
-     container.innerHTML = html;
-
-     container.querySelectorAll('.expand-feat-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-           var featDiv = this.previousElementSibling;
-           featDiv.classList.toggle('expanded');
-           this.textContent = featDiv.classList.contains('expanded') ? 'LESS' : 'MORE';
-        });
-     });
-  }
-
-  // ---------- ENCYCLOPEDIA & AWARDS MOCK/IMPLEMENTATION ----------
-  function loadEncyclopedia() {
-     api('encyclopedia').then(function(pages) {
-        encyclopediaLoaded = true;
-        var container = document.getElementById('enc-wrap');
-        if(!pages || !pages.length) {
-           container.innerHTML = '<div class="empty">Encyclopedia loading soon.</div>';
-           return;
-        }
-        var html = '<div class="enc-book" id="enc-book-elem">';
-        pages.forEach(function(p, i) {
-           html += '<div class="enc-page-inner ' + (i === 0 ? '' : 'subpane') + '" id="enc-page-'+i+'">' +
-             '<img src="' + escapeHtml(p.image) + '" style="max-width:100%;">' +
-           '</div>';
-        });
-        html += '</div>';
-        container.innerHTML = html;
-     }).catch(function(err) {
-        renderErrorWithRetry(document.getElementById('enc-wrap'), 'Failed to load encyclopedia.', loadEncyclopedia);
-     });
-  }
-
-  function loadTop5() {
-     api('top5').then(function(data) {
-        top5Loaded = true;
-        document.getElementById('weekly-rankings-container').innerHTML = '<div class="empty">Weekly top 5 updating soon!</div>';
-        document.getElementById('pane-yearly').innerHTML = '<div class="empty">Yearly top 10 updating soon!</div>';
-        document.getElementById('deans-awards-container').innerHTML = '<div class="empty">Awards data pending!</div>';
-        document.getElementById('pane-playlists').innerHTML = '<div class="empty">Playlists to be added.</div>';
-        document.getElementById('pane-stats').innerHTML = '<div class="empty">Artist stats loading soon...</div>';
-     }).catch(function(err) {
-        renderErrorWithRetry(document.getElementById('weekly-rankings-container'), 'Failed to load rankings.', loadTop5);
-     });
-  }
-
-  // GLOBAL BACK NAVIGATION HANDLER
-  document.addEventListener('click', function(e) {
-     if(e.target && e.target.id === 'franchise-songs-back') {
-        if (currentFranchiseCharDetail) showFranchiseDetail(currentFranchiseCharDetail.franchise);
-        else if (currentFranchiseAllDetail) showFranchiseDetail(currentFranchiseAllDetail);
-        else if (currentFranchiseGeneralDetail) showFranchiseDetail(currentFranchiseGeneralDetail);
-        else if (currentArtistFeaturedDetail) showArtistDetail(currentArtistFeaturedDetail);
-        else showLyricsList();
-     }
-     if(e.target && e.target.id === 'lyric-detail-back') {
-        window.history.back();
-     }
+  document.getElementById('franchise-songs-back').addEventListener('click', function () {
+    if (currentFranchiseCharDetail) showFranchiseDetail(currentFranchiseCharDetail.franchise);
+    else if (currentFranchiseGeneralDetail) showFranchiseDetail(currentFranchiseGeneralDetail);
+    else if (currentFranchiseAllDetail) showFranchiseDetail(currentFranchiseAllDetail);
+    else showLyricsList();
   });
 
+  document.getElementById('brand-home').addEventListener('click', showHome);
+  document.getElementById('lyric-detail-back').addEventListener('click', function () {
+    if (currentArtistDetail) showArtistDetail(currentArtistDetail);
+    else if (currentFranchiseCharDetail) showFranchiseCharacterDetail(currentFranchiseCharDetail.franchise, currentFranchiseCharDetail.character);
+    else if (currentFranchiseGeneralDetail) showFranchiseGeneralSongs(currentFranchiseGeneralDetail);
+    else if (currentFranchiseAllDetail) showFranchiseAllSongs(currentFranchiseAllDetail);
+    else showLyricsList();
+  });
+
+  // INITIALIZATION
+  loadSettings();
+  loadDisclaimers();
+  routeFromHash();
 </script>
 </body>
 </html>
