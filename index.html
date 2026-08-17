@@ -1378,6 +1378,15 @@
     return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  // Matches a search query against a song's primary artist(s) and
+  // featured artist(s), so the search box can find songs by collaborator
+  // or featured-artist name, not just by title.
+  function songArtistsMatchQuery_(item, q) {
+    if (!isNA(item.artist) && String(item.artist).toLowerCase().indexOf(q) !== -1) return true;
+    if (!isNA(item.featured) && String(item.featured).toLowerCase().indexOf(q) !== -1) return true;
+    return false;
+  }
+
   function loadLyrics() {
     var lyricsPromise = api('lyrics');
     var artistsPromise = artistsLoaded ? Promise.resolve(null) : api('artists').catch(function () { return null; });
@@ -2020,7 +2029,9 @@
     }
 
     var q = franchiseSongsSearchQuery.trim().toLowerCase();
-    var songs = q ? sorted.filter(function (s) { return String(s.title || '').toLowerCase().indexOf(q) !== -1; }) : sorted;
+    var songs = q ? sorted.filter(function (s) {
+      return String(s.title || '').toLowerCase().indexOf(q) !== -1 || songArtistsMatchQuery_(s, q);
+    }) : sorted;
 
     var fieldLabel = franchiseSongsSortField === 'artist' ? 'ARTIST' : 'SONG';
     var dirFirst = franchiseSongsSortDir === 'asc' ? 'A' : 'Z';
@@ -2030,7 +2041,7 @@
 
     var toolbarRow =
       '<div class="artist-detail-toolbar">' +
-        '<input type="text" class="search-box artist-detail-search" id="franchise-songs-search" placeholder="Search songs&hellip;" value="' + escapeHtml(franchiseSongsSearchQuery) + '">' +
+        '<input type="text" class="search-box artist-detail-search" id="franchise-songs-search" placeholder="Search songs, artists&hellip;" value="' + escapeHtml(franchiseSongsSearchQuery) + '">' +
         '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
           '<div class="nav-tab" id="franchise-songs-sortfield-toggle">SORT BY: ' + fieldLabel + '</div>' +
           '<div class="nav-tab" id="franchise-songs-sortdir-toggle">' + dirFirst + '<span class="sort-arrow">&#8594;</span>' + dirSecond + '</div>' +
@@ -2182,14 +2193,16 @@
 
     var q = artistDetailSearchQuery.trim().toLowerCase();
     var songs = q ? allSongs.filter(function (s) {
-      return String(s.title || '').toLowerCase().indexOf(q) !== -1 || songTagsMatchQuery_(s, q);
+      return String(s.title || '').toLowerCase().indexOf(q) !== -1 ||
+        songTagsMatchQuery_(s, q) ||
+        songArtistsMatchQuery_(s, q);
     }) : allSongs;
 
     var sortFirst = artistDetailSortDir === 'asc' ? 'A' : 'Z';
     var sortSecond = artistDetailSortDir === 'asc' ? 'Z' : 'A';
     var toolbarRow =
       '<div class="artist-detail-toolbar">' +
-        '<input type="text" class="search-box artist-detail-search" id="artist-detail-search" placeholder="Search songs or tags&hellip;" value="' + escapeHtml(artistDetailSearchQuery) + '">' +
+        '<input type="text" class="search-box artist-detail-search" id="artist-detail-search" placeholder="Search songs, artists, or tags&hellip;" value="' + escapeHtml(artistDetailSearchQuery) + '">' +
         '<div class="nav-tab" id="artist-detail-sort-toggle">SORT: ' + sortFirst + '<span class="sort-arrow">&#8594;</span>' + sortSecond + '</div>' +
       '</div>';
 
