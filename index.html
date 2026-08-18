@@ -2257,12 +2257,12 @@
       });
     }
 
-    container.querySelectorAll('.lyric-card').forEach(function (card) {
-      card.addEventListener('click', function () {
-        if (card.getAttribute('data-locked') === 'true') return;
-        showLyricsDetail(card.getAttribute('data-id'));
-      });
+    container.querySelectorAll('.lyric-card[data-id]').forEach(function (card) {
+    card.addEventListener('click', function () {
+      if (card.getAttribute('data-locked') === 'true') return;
+      showLyricsDetail(card.getAttribute('data-id'));
     });
+  });
   }
 
   document.getElementById('lyric-detail-back').addEventListener('click', function () {
