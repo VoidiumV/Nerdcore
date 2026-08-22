@@ -769,7 +769,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzuZKRpTBbX7Z1A4ikRhbG1VtxITo8HgJco0IetzvyPVvwn2zTlHrrNJ5RAA04AV004/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzVEbuoDe6eOnZb2dln3Tr1m1xZFpHxmgFpEPmirw0cT1GrHnC8PvcWyOd70YDOGIpA/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -2116,13 +2116,17 @@
     var fallback = getFallbackImage();
     var img = album.cover ? optimizeArtUrl(album.cover, 440) : fallback;
 
-    // Tracks are matched to this album by exact Album ID (the album's row
-    // number on the Albums tab), never by title text or artist overlap --
-    // so two different albums that happen to share a title, even across two
-    // completely different artists, can never get mixed up. See
-    // parseAlbumTrackCell_ in code.gs for how the Lyrics "Album" cell is read.
+    // Tracks are matched to this album by its Album ID (from the Albums
+    // tab's "Album ID" column, or the row-number fallback if that was left
+    // blank), never by title text or artist overlap -- so two different
+    // albums that happen to share a title, even across two completely
+    // different artists, can never get mixed up. The comparison is
+    // case/whitespace-insensitive since Album IDs are free text you choose.
+    // See parseAlbumTrackCell_ in code.gs for how the Lyrics "Album Track"
+    // cell is read.
+    var albumIdKey = normalizeArtistKey(album.id);
     var tracks = allLyrics.filter(function (item) {
-      return item.albumId && String(item.albumId) === String(album.id);
+      return !isNA(item.albumId) && normalizeArtistKey(item.albumId) === albumIdKey;
     }).slice().sort(function (a, b) {
       var an = (a.trackNum === null || a.trackNum === undefined) ? Infinity : a.trackNum;
       var bn = (b.trackNum === null || b.trackNum === undefined) ? Infinity : b.trackNum;
@@ -2622,7 +2626,7 @@
     });
   }
 
-  // RELEASES 
+  // RELEASES
   function loadReleases() {
     api('releases').then(function (list) {
       releasesLoaded = true;
