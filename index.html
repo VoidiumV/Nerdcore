@@ -752,6 +752,9 @@
   <div class="modal-box">
     <h3 id="bug-report-modal-title">REPORT AN ISSUE</h3>
     <p id="bug-report-modal-desc">What's wrong with this page? Select all that apply.</p>
+    <p id="bug-report-missing-note" style="display:none; font-size:15px; color:var(--muted-dim); margin:-8px 0 14px; line-height:1.4;">
+      Already listed but something's wrong with it? Use that song's own "REPORT ISSUE" button instead. This area is only for songs missing from the list.
+    </p>
     <div class="bug-report-options" id="bug-report-options">
       <label class="bug-report-option"><input type="checkbox" value="Incorrect lyrics/grammar/spelling"> Incorrect lyrics / grammar / spelling</label>
       <label class="bug-report-option"><input type="checkbox" value="Incorrect audio link"> Incorrect audio link</label>
@@ -760,7 +763,7 @@
       <label class="bug-report-option"><input type="checkbox" value="Incorrectly color coded / no color coding"> Incorrectly color coded / no color coding</label>
       <label class="bug-report-option"><input type="checkbox" id="bug-report-other-check" value="Other"> Other</label>
     </div>
-    <textarea id="bug-report-text" placeholder="(optional) what's wrong&hellip;"></textarea>
+    <textarea id="bug-report-text" placeholder="(optional) what's wrong…"></textarea>
     <div class="modal-actions">
       <div class="modal-btn" id="bug-report-cancel">CANCEL</div>
       <div class="modal-btn primary" id="bug-report-submit">SUBMIT</div>
@@ -769,7 +772,7 @@
 </div>
 
 <script>
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzVEbuoDe6eOnZb2dln3Tr1m1xZFpHxmgFpEPmirw0cT1GrHnC8PvcWyOd70YDOGIpA/exec';
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzaHULksJLEyWpnxZ2xLINaM9XHQJ50zdQZ4SqXjrOjfg7fUN_K21BfTaoVOA0ZjBdY/exec';
 
   var jsonpCounter = 0;
   var API_TIMEOUT_MS = 20000;
@@ -910,7 +913,7 @@
   // BUG / QUALITY REPORT MODAL
   var bugReportContext = null;
 
-  function openBugReportModal(context) {
+    function openBugReportModal(context) {
     bugReportContext = context || {};
     var isMissing = bugReportContext.mode === 'missing';
 
@@ -920,23 +923,27 @@
       : "What's wrong with this page? Select all that apply.";
     document.getElementById('bug-report-options').style.display = isMissing ? 'none' : '';
 
+    var noteEl = document.getElementById('bug-report-missing-note');
+    if (noteEl) noteEl.style.display = isMissing ? '' : 'none';
+
     document.querySelectorAll('#bug-report-options input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
     document.getElementById('bug-report-text').value = '';
     document.getElementById('bug-report-text').placeholder = isMissing
-      ? 'Song title, and a YouTube/Spotify link if you have one&hellip;'
-      : "(optional) what's wrong&hellip;";
+      ? 'Song title, and a YouTube/Spotify link if you have one…'
+      : "(optional) what's wrong…";
     document.getElementById('bug-report-submit').textContent = 'SUBMIT';
     document.getElementById('bug-report-overlay').classList.add('open');
   }
+  
   function closeBugReportModal() {
     document.getElementById('bug-report-overlay').classList.remove('open');
     bugReportContext = null;
   }
 
-  function wireMissingSongLink_(artistName) {
-    var link = document.getElementById('artist-report-missing-link');
-    if (link) {
-      link.addEventListener('click', function () {
+    function wireArtistMissingSongButton_(artistName) {
+    var btn = document.getElementById('artist-report-missing-btn');
+    if (btn) {
+      btn.addEventListener('click', function () {
         openBugReportModal({ mode: 'missing', artist: artistName });
       });
     }
@@ -1232,9 +1239,18 @@
     if (window.location.hash !== full) window.history.pushState({ path: p }, '', full);
   }
 
-  function routeFromHash() {
+    function routeFromHash() {
     var path = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
     if (!path || path === 'home') { showHome(); return; }
+
+    var isLyricsFamily = path === 'lyrics' ||
+      path.indexOf('artist-featured-') === 0 ||
+      path.indexOf('album-') === 0 ||
+      path.indexOf('artist-') === 0 ||
+      path.indexOf('lyric-') === 0 ||
+      path.indexOf('franchise/') === 0;
+    if (isLyricsFamily && isRouteHidden_('lyrics')) { showHome(); return; }
+
     if (path === 'lyrics') { showLyricsList(); return; }
     if (path.indexOf('artist-featured-') === 0) { showArtistFeaturedSongs(decodeURIComponent(path.slice(16))); return; }
     if (path.indexOf('album-') === 0) { showAlbumDetail(decodeURIComponent(path.slice(6))); return; }
@@ -1248,13 +1264,14 @@
       if (segs.length === 2 && segs[1] === 'general') { showFranchiseGeneralSongs(decodeURIComponent(segs[0])); return; }
       if (segs.length === 3 && segs[1] === 'char') { showFranchiseCharacterDetail(decodeURIComponent(segs[0]), decodeURIComponent(segs[2])); return; }
     }
-    if (path === 'encyclopedia') { showEncyclopedia(); return; }
-    if (path === 'releases') { showReleases(); return; }
-    if (path === 'top5') { showTop5(); return; }
-    if (path === 'indiemonday') { showIndieMonday(); return; }
-    if (path === 'about') { showAbout(); return; }
+    if (path === 'encyclopedia') { if (isRouteHidden_('encyclopedia')) { showHome(); return; } showEncyclopedia(); return; }
+    if (path === 'releases') { if (isRouteHidden_('releases')) { showHome(); return; } showReleases(); return; }
+    if (path === 'top5') { if (isRouteHidden_('top5')) { showHome(); return; } showTop5(); return; }
+    if (path === 'indiemonday') { if (isRouteHidden_('indiemonday')) { showHome(); return; } showIndieMonday(); return; }
+    if (path === 'about') { if (isRouteHidden_('about')) { showHome(); return; } showAbout(); return; }
     showHome();
   }
+  
   window.addEventListener('popstate', routeFromHash);
   window.addEventListener('hashchange', routeFromHash);
 
@@ -1344,6 +1361,26 @@
     }
   }
 
+    // HIDDEN PAGES (driven by Settings > "Hidden Pages")
+  var hiddenRoutesMap = {};
+
+  function isRouteHidden_(route) {
+    return !!hiddenRoutesMap[route];
+  }
+
+  function applyHiddenPages_(hiddenRoutes) {
+    hiddenRoutesMap = {};
+    (hiddenRoutes || []).forEach(function (r) { hiddenRoutesMap[r] = true; });
+    document.querySelectorAll('.nav-tab[data-route]').forEach(function (el) {
+      var r = el.getAttribute('data-route');
+      el.style.display = isRouteHidden_(r) ? 'none' : '';
+    });
+    document.querySelectorAll('.home-tile[data-route]').forEach(function (el) {
+      var r = el.getAttribute('data-route');
+      el.style.display = isRouteHidden_(r) ? 'none' : '';
+    });
+  }
+
   // ABOUT
   function loadAbout() {
     var container = document.getElementById('about-content');
@@ -1398,6 +1435,8 @@
       if (siteSettings.siteTitle) document.getElementById('site-title').innerHTML = siteSettings.siteTitle;
       if (siteSettings.tagline) document.getElementById('home-tagline').textContent = siteSettings.tagline;
       renderSocialLinks();
+      applyHiddenPages_(siteSettings.hiddenPages);
+      routeFromHash();
     }).catch(function () { });
   }
 
@@ -2351,6 +2390,7 @@
   }
 
   // ARTIST DETAIL
+    // ARTIST DETAIL
   function renderArtistDetail(name) {
     var container = document.getElementById('artist-detail-content');
     var pfpEntry = allArtists.filter(function (a) {
@@ -2372,6 +2412,7 @@
 
     var header =
       '<div class="detail-hero">' +
+        '<span class="report-btn-corner" id="artist-report-missing-btn">&#9873; REPORT MISSING SONG</span>' +
         '<img class="detail-hero-img" src="' + escapeHtml(optimizeArtUrl(pfp, 440)) + '" loading="eager" decoding="async" fetchpriority="high" onerror="this.src=\'' + fallback + '\'">' +
         '<div class="detail-hero-text">' +
           '<h1 class="detail-title">' + escapeHtml(name) + '</h1>' +
@@ -2388,6 +2429,7 @@
     if (artistDetailViewMode === 'albums') {
       container.innerHTML = header + viewTabs + '<div id="artist-albums-pane"><div class="loading">Loading albums&hellip;</div></div>';
       wireArtistViewTabs_(name);
+      wireArtistMissingSongButton_(name);
       if (!albumsLoaded) {
         api('albums').then(function (list) {
           allAlbums = list || [];
@@ -2412,18 +2454,10 @@
           '</div>' +
         '</div>'
       : '';
-    
-    var missingSongBlock =
-      '<div class="disclaimer-banner" style="margin-bottom:16px; font-size:15px;">' +
-        '&#9888; Wrong lyrics, art, or links on a song that\'s already listed? Use the "REPORT ISSUE" button on that song\'s own page instead \u2014 the link below is only for songs missing from this list.' +
-      '</div>' +
-      '<div style="display:flex; justify-content:flex-end; margin-bottom:16px;">' +
-        '<span class="back-link" id="artist-report-missing-link" style="margin-bottom:0;">+ Report a missing song by ' + escapeHtml(name) + '</span>' +
-      '</div>';
 
     if (!allSongs.length) {
-      container.innerHTML = header + viewTabs + featuredTile + missingSongBlock + '<div class="empty">No songs posted for this artist yet.</div>';
-      wireMissingSongLink_(name);
+      container.innerHTML = header + viewTabs + featuredTile + '<div class="empty">No songs posted for this artist yet.</div>';
+      wireArtistMissingSongButton_(name);
       wireArtistViewTabs_(name);
       var featuredTileElEmpty = document.getElementById('artist-featured-tile');
       if (featuredTileElEmpty) featuredTileElEmpty.addEventListener('click', function () { showArtistFeaturedSongs(name); });
@@ -2469,8 +2503,8 @@
       }).join('');
     }
 
-    container.innerHTML = header + viewTabs + featuredTile + missingSongBlock + toolbarRow + cardsHtml;
-    wireMissingSongLink_(name);
+    container.innerHTML = header + viewTabs + featuredTile + toolbarRow + cardsHtml;
+    wireArtistMissingSongButton_(name);
     wireArtistViewTabs_(name);
     var featuredTileEl = document.getElementById('artist-featured-tile');
     if (featuredTileEl) featuredTileEl.addEventListener('click', function () { showArtistFeaturedSongs(name); });
